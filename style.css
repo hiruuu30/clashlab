@@ -562,3 +562,44 @@ body:not(.match-view) .team-list{grid-row:4}
  .dex-card .dex-add button{min-height:44px}
 }
 @media(max-width:360px){.score b{font-size:6px}.markers{gap:2px}.clock{min-width:58px}.tool-menu>summary{font-size:15px}}
+
+
+/* Restore parallel team setup on phones; leave the compact tools and live battle untouched. */
+@media(max-width:560px){
+ body:not(.match-view) .lab{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:10px}
+ body:not(.match-view) .team{grid-row:3;grid-template-rows:112px auto auto 1fr;align-self:start;min-width:0}
+ body:not(.match-view) .team-a{grid-column:1;grid-row:3}
+ body:not(.match-view) .team-b{grid-column:2;grid-row:3}
+ body:not(.match-view) .active-card{min-width:0;padding:3px;border-width:6px;border-image-width:6px}
+ body:not(.match-view) .active-heading{grid-template-columns:28px minmax(0,1fr);gap:3px 5px}
+ body:not(.match-view) .active-heading img{width:28px;grid-row:span 2}
+ body:not(.match-view) .active-heading strong{font-size:8px;line-height:1.4;overflow-wrap:anywhere}
+ body:not(.match-view) .active-heading small{font-size:14px;line-height:1.05}
+ body:not(.match-view) .active-heading b{grid-column:2;font-size:14px}
+ body:not(.match-view) .hp{height:18px;margin-top:4px}
+ body:not(.match-view) .hp b{font-size:16px;line-height:18px}
+ body:not(.match-view) .buffs{margin-top:3px;min-height:0}
+ body:not(.match-view) .buffs span{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ body:not(.match-view) .team-head{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-height:0}
+ body:not(.match-view) .team-head select{width:100%;min-width:0;min-height:36px;font-size:16px}
+ body:not(.match-view) .team-controls{padding:4px;gap:3px}
+ body:not(.match-view) .team-controls select{min-width:0;min-height:34px;font-size:15px;padding-inline:2px}
+ body:not(.match-view) .auto-toggle{gap:5px;min-height:34px;font-size:16px;white-space:nowrap}
+ body:not(.match-view) .auto-toggle input{width:18px;height:18px}
+ body:not(.match-view) .team-list{grid-auto-rows:76px;gap:4px}
+ body:not(.match-view) .team-list .slot{grid-template-columns:minmax(0,1fr) auto;border-width:3px;border-image-width:3px}
+ body:not(.match-view) .slot-main{min-height:0;height:100%;gap:4px;padding:2px;align-items:center}
+ body:not(.match-view) .slot-main img{width:26px;height:26px}
+ body:not(.match-view) .slot-content strong{font-size:16px;line-height:1.05;white-space:normal;overflow-wrap:anywhere}
+ body:not(.match-view) .slot-content small{font-size:13px;line-height:1.05;-webkit-line-clamp:2;overflow-wrap:anywhere}
+ body:not(.match-view) .slot-buttons{flex-direction:column;justify-content:center;gap:1px}
+ body:not(.match-view) .slot-buttons button{min-width:26px;min-height:32px;padding:0;font-size:18px}
+}
+@media(max-width:360px){
+ body:not(.match-view) .lab{column-gap:5px;padding:6px}
+ body:not(.match-view) .slot-main{gap:3px;padding:1px}
+ body:not(.match-view) .slot-main img{width:22px;height:22px}
+ body:not(.match-view) .slot-buttons button{min-width:23px}
+ body:not(.match-view) .slot-content strong{font-size:15px}
+ body:not(.match-view) .auto-toggle{font-size:15px;gap:3px}
+}
