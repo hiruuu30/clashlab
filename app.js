@@ -20,6 +20,8 @@ let events=[];
 let starting=false;
 let arena;
 let knockoutUntil=0;
+let battleStartsAt=0;
+const compactBattle=matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 520px)');
 let benchmarkJob=0;
 const arenaFrame=$('arena-frame');
 const portraitRequests=new Set();
@@ -99,14 +101,36 @@ function notify(text) {
 }
 function clearNotice() {$('load-error').hidden=true;}
 function disabled(value) {return value?' disabled':'';}
+function healthPercent(mon) {
+  return mon ? Math.round(100 * Math.max(0,Math.min(1,mon.hp/mon.max))) : 100;
+}
+function healthColor(percent) {
+  return percent>50?'#46d65a':percent>22?'#f0c23a':'#ea4a3a';
+}
 function healthFill(mon) {
-  const percent=mon ? Math.round(100 * Math.max(0,Math.min(1,mon.hp/mon.max))) : 100;
-  const color=percent>50?'#46d65a':percent>22?'#f0c23a':'#ea4a3a';
-  return '<i style="width:'+percent+'%;background:'+color+'"></i>';
+  const percent=healthPercent(mon);
+  return '<i style="width:'+percent+'%;background:'+healthColor(percent)+'"></i>';
 }
 function renderTeams() {
   sides.forEach((_,i)=>renderTeam(i));
   requestPortraits();
+}
+function canSwapTo(current, index, isArenaOpponent) {
+  const active=current?.active;
+  return running && !finishing && !isArenaOpponent && active && !active.ko && current.swap<=0 &&
+    active.slot!==index && !current.team[index]?.ko && !['enter','recall','faint'].includes(active.state);
+}
+function activeCard(i,current) {
+  const mon=current?.active;
+  const lead=config.teams[i].find(Boolean);
+  const leadSpecies=species[lead?.id];
+  const id=mon?.id || lead?.id;
+  const typeNames=(mon?.types || leadSpecies?.types || []).map(type=>catalog.types[type]).join(' / ');
+  const ability=mon?.isMega?'Mega evolved':species[id]?.ability;
+  const name=mon?.name || (live?'Waiting…':leadSpecies?.name || 'No lead');
+  const level=mon?'Lv '+mon.lv:lead && !live?'Lv '+levelFor(lead):'';
+  const hp=mon?Math.ceil(mon.hp)+' / '+Math.ceil(mon.max):'—';
+  return '<div class="active-heading"><img data-portrait="'+escape(id)+'" src="'+portrait(id,mon?.portrait)+'" alt=""><div><strong title="'+escape(name)+'">'+escape(name)+'</strong><small>'+escape(typeNames)+'</small></div><b>'+escape(level)+'</b></div><div class="hp" aria-label="'+title(i)+' health">'+healthFill(mon)+'<b>'+hp+'</b></div><div class="buffs">'+(current?.read?'<span>READ</span>':'')+(ability?'<span>'+escape(ability)+'</span>':'')+'</div>';
 }
 function renderTeam(i) {
   const target=$('team-'+sides[i]);
@@ -120,41 +144,88 @@ function renderTeam(i) {
     const battleIndex=memberIndex++;
     const mon=current?.team?.[battleIndex];
     const active=current?.active?.slot===battleIndex;
-    const canSwap=running && !finishing && !isArenaOpponent && !active && !mon?.ko && current?.active &&
-      !current.active.ko && !['enter','recall','faint'].includes(current.active.state) && current.swap<=0;
     const displayed=mon?.name || (slot.mega?s.mega[slot.mega-1]:s.name);
     const details='Lv '+(mon?.lv ?? levelFor(slot))+(live?'':' · '+s.types.map(t=>catalog.types[t]).join('/')+(items[slot.item]?' · '+items[slot.item].name:''));
-    return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwap:bench||starting)+' aria-label="'+escape((running?'Switch to ':'Edit ')+s.name)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
+    const action=(running?'Switch to ':'Edit ')+s.name;
+    return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,isArenaOpponent):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
       +(locked?'':'<div class="slot-buttons"><button data-reorder="'+index+',-1" aria-label="Move '+escape(s.name)+' up"'+disabled(index===0)+'>↑</button><button data-reorder="'+index+',1" aria-label="Move '+escape(s.name)+' down"'+disabled(index===5)+'>↓</button></div>')+'</div>';
   }).join('');
-  const mon=current?.active;
-  const lead=config.teams[i].find(Boolean);
-  const leadSpecies=species[lead?.id];
-  const portraitId=mon?.id || lead?.id;
-  const typeNames=(mon?.types || leadSpecies?.types || []).map(type=>catalog.types[type]).join(' / ');
-  const ability=mon?.isMega?'Mega evolved':species[mon?.id || lead?.id]?.ability;
-  const activeCard='<div class="active-card"><div class="active-heading"><img data-portrait="'+escape(portraitId)+'" src="'+portrait(portraitId,mon?.portrait)+'" alt=""><div><strong>'+escape(mon?.name || (live?'Waiting…':leadSpecies?.name || 'No lead'))+'</strong><small>'+escape(typeNames)+'</small></div><b>'+escape(mon?'Lv '+mon.lv:lead && !live?'Lv '+levelFor(lead):'')+'</b></div><div class="hp" aria-label="'+title(i)+' health">'+healthFill(mon)+'<b>'+(mon?Math.ceil(mon.hp)+' / '+Math.ceil(mon.max):'—')+'</b></div><div class="buffs">'+(current?.read?'<span>READ</span>':'')+(ability?'<span>'+escape(ability)+'</span>':'')+'</div></div>';
-  target.innerHTML=activeCard+'<header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(isArenaOpponent||bench||starting)+'>'+options([['on',isArenaOpponent?'Game AI':'Auto Special'],['off','Manual Special']],isArenaOpponent||config.automatic[i]?'on':'off')+'</select></label></div>';
+  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(isArenaOpponent||bench||starting)+'>'+options([['on',isArenaOpponent?'Game AI':'Auto Special'],['off','Manual Special']],isArenaOpponent||config.automatic[i]?'on':'off')+'</select></label></div>';
+}
+
+function updateHp(bar,mon) {
+  if(!mon)return;
+  const percent=healthPercent(mon);
+  bar.style.width=percent+'%';
+  bar.style.background=healthColor(percent);
+}
+function updateLiveTeam(i) {
+  const panel=$('team-'+sides[i]);
+  const current=live.sides[i];
+  const previous=panel.querySelector('.active-card');
+  const mon=current.active;
+  const identity=mon ? mon.slot+':'+mon.name : '';
+  const hp=mon?.hp ?? 0;
+  if(previous.dataset.fighter!==identity) {
+    previous.innerHTML=activeCard(i,current);
+    previous.dataset.fighter=identity;
+  } else if(mon) {
+    updateHp(previous.querySelector('.hp i'),mon);
+    previous.querySelector('.hp b').textContent=Math.ceil(hp)+' / '+Math.ceil(mon.max);
+    if(hp<Number(previous.dataset.hp) && !finishing && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      previous.animate([{transform:'translateX(-3px)'},{transform:'translateX(3px)'},{transform:'none'}],{duration:200,easing:'steps(3)'});
+    }
+  }
+  previous.dataset.hp=hp;
+  const isArenaOpponent=mode().kind==='arena'&&i===1;
+  for(const button of panel.querySelectorAll('[data-swap]')) {
+    const index=Number(button.dataset.swap);
+    const member=current.team[index];
+    const slot=button.closest('.slot');
+    button.disabled=!canSwapTo(current,index,isArenaOpponent);
+    slot.classList.toggle('selected',mon?.slot===index);
+    slot.classList.toggle('knocked',member.ko);
+    updateHp(button.querySelector('.mini i'),member);
+    const name=button.querySelector('strong');
+    if(name.textContent!==member.name) {
+      name.textContent=member.name;
+      button.querySelector('img').src=portrait(member.id,member.portrait);
+    }
+  }
 }
 function updateBattleActions() {
   const actions=$('battle-actions');
   actions.hidden=!running;
-  if(!running)return;
-  const buttons=sides.map((side,i)=>{
-    const state=live?.sides[i];
-    const ai=mode().kind==='arena'&&i===1;
-    const charge=Math.floor((state?.meter||0)*100);
-    const ready=state?.canSpecial&&!ai&&!finishing;
+  if(!running){
+    actions.replaceChildren();
+    return;
+  }
+  if(!actions.children.length)actions.innerHTML=sides.map((side,i)=>{
     const mega=config.teams[i].some(slot=>slot?.mega);
-    const canMega=state?.canMega&&!ai&&!finishing;
-    const swap=state?.swap||0;
-    return '<div class="battle-control '+side+'"><span class="control-name">'+title(i)+'</span><button class="pv-sp'+(ready?' ready':'')+'" data-command="f" data-side="'+i+'" aria-label="'+title(i)+' Special"'+disabled(!ready)+'><i style="width:'+charge+'%"></i><span><b>SPECIAL</b><small>'+(ready?'tap now':charge+'%')+'</small></span></button>'+
-      (mega?'<button class="pv-mg'+(canMega?' ready':'')+'" data-command="m" data-side="'+i+'" aria-label="'+title(i)+' Mega"'+disabled(!canMega)+'><b>MEGA</b><small>'+(state?.megaDone?'used':canMega?'tap now':'wait')+'</small></button>':'')+
-      '<span class="swap-state"><small>Swap</small><b>'+(ai?'AI':swap>0?Math.ceil(swap)+'s':'ready')+'</b></span></div>';
+    return '<div class="battle-control '+side+'"><span class="control-name">'+title(i)+'</span><button class="pv-sp" data-command="f" data-side="'+i+'" aria-label="'+title(i)+' Special"><i></i><span><b>SPECIAL</b><small></small></span></button>'+
+      (mega?'<button class="pv-mg" data-command="m" data-side="'+i+'" aria-label="'+title(i)+' Mega"><b>MEGA</b><small></small></button>':'')+
+      '<span class="swap-state"><small>Swap</small><b></b></span></div>';
+  }).join('');
+  sides.forEach((_,i)=>{
+    const panel=actions.children[i];
+    const state=live.sides[i];
+    const ai=mode().kind==='arena'&&i===1;
+    const charge=Math.floor((state.meter||0)*100);
+    const special=panel.querySelector('.pv-sp');
+    const ready=state.canSpecial&&!ai&&!finishing;
+    special.disabled=!ready;
+    special.classList.toggle('ready',ready);
+    special.querySelector('i').style.width=charge+'%';
+    special.querySelector('small').textContent=ready?'tap now':charge+'%';
+    const mega=panel.querySelector('.pv-mg');
+    const canMega=state.canMega&&!ai&&!finishing;
+    if(mega){
+      mega.disabled=!canMega;
+      mega.classList.toggle('ready',canMega);
+      mega.querySelector('small').textContent=state.megaDone?'used':canMega?'tap now':'wait';
+    }
+    panel.querySelector('.swap-state b').textContent=ai?'AI':state.swap>0?Math.ceil(state.swap)+'s':'ready';
   });
-  const focus=document.activeElement?.closest('#battle-actions button');
-  actions.innerHTML=buttons.join('');
-  if(focus)actions.querySelector('[data-command="'+focus.dataset.command+'"][data-side="'+focus.dataset.side+'"]:enabled')?.focus({preventScroll:true});
 }
 function eventRows() {
   const log=$('log');
@@ -178,9 +249,10 @@ function clearKnockout() {
   $('knockout').hidden=true;
 }
 function show() {
+  document.body.classList.toggle('match-view',starting||running||Boolean(live?.over));
   const tick=live?.tick||0;
   $('clock').value=clock(tick);
-  const caption=starting?'Loading sprites…':bench?'Benchmark in progress':live?.over?'Battle complete':running?(finishing?'Resolving the battle…':playing?tactic.find(([key])=>key===config.tactics[0])[1]+' vs '+tactic.find(([key])=>key===config.tactics[1])[1]:'Paused'):mode()?.name||'Set your teams to begin';
+  const caption=starting?'Loading sprites…':battleStartsAt?'Get ready':bench?'Benchmark in progress':live?.over?'Battle complete':running?(finishing?'Resolving the battle…':playing?tactic.find(([key])=>key===config.tactics[0])[1]+' vs '+tactic.find(([key])=>key===config.tactics[1])[1]:'Paused'):mode()?.name||'Set your teams to begin';
   $('match-caption').textContent=caption;
   const alive=config.teams.every(x=>x.some(Boolean));
   $('start').disabled=!arena||starting||running||bench||!alive;
@@ -189,9 +261,9 @@ function show() {
   $('rules').disabled=starting||running||bench;
   $('seed').disabled=starting||running||bench;
   $('random').disabled=starting||running||bench;
-  $('pause').disabled=!running||finishing;
+  $('pause').disabled=!running||finishing||Boolean(battleStartsAt);
   $('pause').textContent=playing?'Pause':'Resume';
-  $('step').disabled=!running||playing||finishing;
+  $('step').disabled=!running||playing||finishing||Boolean(battleStartsAt);
   $('finish').disabled=!running||finishing;
   sides.forEach((side,i)=>{
     const state=live?.sides[i];
@@ -203,18 +275,12 @@ function show() {
 function clearBattle() {
   live=null;events=[];playing=false;running=false;finishing=false;leftover=0;
   clearKnockout();
+  battleStartsAt=0;
+  $('countdown').hidden=true;
+  $('battle-result').hidden=true;
   arena?.previewArena();
   $('result').hidden=true;
   renderTeams();show();eventRows();updateBattleActions();
-}
-function updateTeams() {
-  const active=document.activeElement;
-  const focusedTeam=active?.closest?.('.team');
-  if(focusedTeam && running && !active.disabled && active.tagName==='SELECT')return;
-  const key=active?.hasAttribute?.('data-swap')?'data-swap':null;
-  const v=key&&active.getAttribute(key);
-  renderTeams();
-  if(key && focusedTeam)focusedTeam.querySelector('[data-swap="'+v+'"]:enabled')?.focus({preventScroll:true});
 }
 function configPayload() {
   config.seed=integer($('seed').value,0,4294967295);
@@ -252,7 +318,7 @@ function handle(message) {
     notify(message.message);
   }
   if(message.type==='error'){
-    running=false;playing=false;bench=false;starting=false;finishing=false;notify(message.message);renderTeams();show();updateBattleActions();
+    bench=false;starting=false;clearBattle();notify(message.message);
   }
   if(message.type==='state'){
     live=message;
@@ -260,10 +326,19 @@ function handle(message) {
     if(message.entries.length)eventRows();
     if(message.over){
       running=false;playing=false;finishing=false;
-      $('result').textContent=message.winner<0?'Draw':title(message.winner)+' wins';
-      $('result').hidden=false;
+      const winner=$('battle-winner');
+      winner.textContent=message.winner<0?'Draw':title(message.winner)+' wins!';
+      $('battle-result').dataset.winner=message.winner;
+      const survivors=message.sides.map(side=>side.team.filter(mon=>!mon.ko).length);
+      $('battle-stats').textContent='Pokémon standing '+survivors.join(' : ')+' · '+clock(message.tick);
+      $('battle-result').hidden=false;
+      winner.focus({preventScroll:true});
     }
-    if(message.over || message.tick>=tickBudget){updateTeams();updateBattleActions();show();tickBudget=message.tick+9;}
+    if(message.over || message.tick===0)renderTeams();
+    if(message.over || message.tick>=tickBudget){
+      if(running)sides.forEach((_,i)=>updateLiveTeam(i));
+      updateBattleActions();show();tickBudget=message.tick+9;
+    }
   }
   if(message.type==='benchmark' && bench && message.job===benchmarkJob){
     const {wins,count,done,totalTicks}=message;
@@ -293,23 +368,39 @@ function connectArena() {
 }
 arenaFrame.addEventListener('arena-ready',connectArena);
 if(arenaFrame.contentWindow.arenaView || arenaFrame.contentWindow.arenaError)connectArena();
-$('start').onclick=async()=>{
+async function startBattle(){
   if(!arena||!ensureTeams())return;
   clearBattle();
   starting=true;renderTeams();show();
+  if(compactBattle.matches){
+    window.scrollTo(0,0);
+    $('match-head').focus({preventScroll:true});
+  }
   const payload=configPayload();
   try {
     await arena.prepare(payload);
     starting=false;running=true;playing=true;tickBudget=0;leftover=0;
+    if(mode().kind==='league')battleStartsAt=performance.now()+3000;
     handle(arena.start(payload));
     arena.draw();
   } catch(error) {
     handle({type:'error',message:error.message});
   }
+}
+$('start').onclick=startBattle;
+$('rematch').onclick=startBattle;
+$('edit-teams').onclick=()=>{
+  clearBattle();
+  window.scrollTo(0,0);
+  $('rules').focus({preventScroll:true});
 };
 $('pause').onclick=()=>{playing=!playing;leftover=0;show();};
 $('step').onclick=()=>advance(60);
-$('finish').onclick=()=>{playing=false;finishing=true;clearKnockout();show();updateBattleActions();};
+$('finish').onclick=()=>{
+  playing=false;finishing=true;battleStartsAt=0;
+  $('countdown').hidden=true;
+  clearKnockout();show();updateBattleActions();
+};
 $('battle-actions').onclick=event=>{
   const button=event.target.closest('button[data-command]');
   if(button && running && !finishing)arena.order(Number(button.dataset.side),[button.dataset.command]);
@@ -335,9 +426,15 @@ function advance(ticks){
 function animation(now) {
   const elapsed=Math.min(190,now-lastFrame);
   lastFrame=now;
+  if(battleStartsAt){
+    const seconds=Math.ceil((battleStartsAt-now)/1000);
+    $('countdown').hidden=seconds<=0;
+    if(seconds>0)$('countdown').value=seconds;
+    else {battleStartsAt=0;show();}
+  }
   if(knockoutUntil && now>=knockoutUntil)clearKnockout();
   if(running && finishing)advance(480);
-  else if(running && playing && !knockoutUntil){
+  else if(running && playing && !knockoutUntil && !battleStartsAt){
     leftover=Math.min(180,leftover+elapsed*0.06*Number($('speed').value));
     if(leftover>=1){const ticks=Math.floor(leftover);leftover-=ticks;advance(ticks);}
   }
@@ -355,7 +452,7 @@ for(let i=0;i<2;i++){
       [config.teams[i][from],config.teams[i][to]]=[config.teams[i][to],config.teams[i][from]];
       persist();clearBattle();
     }
-    if(button.dataset.swap!==undefined)arena.order(i,['s',Number(button.dataset.swap)]);
+    if(running && !finishing && button.dataset.swap!==undefined)arena.order(i,['s',Number(button.dataset.swap)]);
   });
   panel.addEventListener('change',e=>{
     if(e.target.hasAttribute('data-tactic'))config.tactics[i]=e.target.value;

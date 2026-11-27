@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Build teams and test real-time PvP matchups with the PokeClash League battle engine.">
 <link rel="icon" href="./mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./style.css">
@@ -27,7 +27,7 @@
       <label>Benchmark runs <select id="benchmark-count"><option>10</option><option selected>50</option><option>100</option><option>250</option><option>500</option></select></label><div class="actions"><button id="benchmark" class="secondary">Run benchmark</button><button id="start" class="primary"><span aria-hidden="true">▶</span> Start battle</button></div>
     </section>
     <section class="lab" aria-label="Teams and battlefield">
-      <header class="match-head">
+      <header class="match-head" id="match-head" tabindex="-1" aria-label="Battle scoreboard">
         <div class="score team-a-score"><b>Team A</b><span class="markers" id="markers-a" aria-hidden="true"></span><span id="count-a"></span></div>
         <div class="clock"><output id="clock" aria-label="Battle clock">0:00</output><p id="match-caption">Set your teams to begin</p></div>
         <div class="score team-b-score"><span id="count-b"></span><span class="markers" id="markers-b" aria-hidden="true"></span><b>Team B</b></div>
@@ -36,7 +36,18 @@
       <section class="match" aria-label="Battlefield">
         <div class="field">
           <iframe id="arena-frame" title="Animated PokeClash League battlefield" src="./arena-view.html" tabindex="-1"></iframe>
+          <output id="countdown" class="countdown" aria-label="Battle countdown" hidden></output>
           <div id="knockout" class="knockout" hidden aria-hidden="true"></div>
+          <section id="battle-result" class="battle-result" aria-labelledby="battle-winner" hidden>
+            <div class="result-card">
+              <h2 id="battle-winner" tabindex="-1"></h2>
+              <p id="battle-stats"></p>
+              <div class="result-actions">
+                <button class="primary" id="rematch">Rematch</button>
+                <button class="secondary" id="edit-teams">Edit teams</button>
+              </div>
+            </div>
+          </section>
           <p id="arena-message" role="status">Loading the arena…</p>
         </div>
       </section>
