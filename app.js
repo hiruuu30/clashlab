@@ -533,7 +533,7 @@ dex.style.width='min(850px,calc(100% - 24px))';
 dex.innerHTML='<header class="dialog-head"><h2>ClashDex</h2><button class="icon-btn" data-close>×</button></header><div class="editor-fields"><input id="dex-query" type="search" placeholder="Search name, ability or TM"><div class="form-grid"><label>Rarity<select id="dex-rarity"></select></label><label>Type<select id="dex-type"></select></label><label>Role<select id="dex-role"></select></label><label>Sort<select id="dex-sort"><option value="name">Name</option><option value="coverage">Native type coverage</option><option value="bst">Base stat total</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spd">Speed</option><option value="learn">TM versatility</option><option value="mega">Mega options</option><option value="id">Dex number</option></select></label></div><label><span><input type="checkbox" id="dex-mega"> Mega available only</span></label><p id="dex-count" class="hint"></p><div id="dex-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px"></div><button class="secondary" id="dex-more">Show more</button></div>';
 document.body.append(dex);
 const toolsBar=document.createElement('div');toolsBar.className='actions';toolsBar.style.flexWrap='wrap';
-toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button>';
+toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import JSON</button><button class="secondary" id="trainer-import">Import trainer</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button>';
 document.querySelector('.setup').append(toolsBar);
 let dexLimit=36;
 function dexRender(){
@@ -643,3 +643,49 @@ $('build-open').onclick=()=>{
  const rows=catalog.items.map(it=>({it,lv:levelFor({...m,item:String(it.k)})})).sort((a,b)=>b.lv-a.lv||a.it.name.localeCompare(b.it.name));
  d.querySelector('[data-results]').innerHTML='<h2>'+escape(p.name)+'</h2><p>No item: Lv '+baseline+' · Current build: Lv '+levelFor(m)+'</p><h2>Held items by effective level</h2>'+rows.slice(0,15).map(({it,lv})=>'<div class="slot" style="padding:7px"><span>'+escape(it.name)+' · Lv '+lv+' (+'+(lv-baseline)+')</span><button class="quiet" data-equip="'+escape(it.k)+'">Equip</button></div>').join('')+'<h2>Compatible TMs</h2><p>'+escape(p.learn.filter(k=>k!==p.innate).map(k=>catalog.skills[k]||k).join(', ')||'None')+'</p><p class="hint">Second TM unlocks at Lv 12. Use the Pokémon editor to select ranks and moves.</p>';
  }d.addEventListener('change',draw);d.addEventListener('click',e=>{const b=e.target.closest('[data-equip]');if(!b||running||starting||bench)return;const [i,j]=d.querySelector('[data-member]').value.split(':').map(Number);if(!items[b.dataset.equip])return;config.teams[i][j].item=b.dataset.equip;persist();clearBattle();draw();});draw();};
+
+$('trainer-import').onclick=()=>{
+ if(!catalog||running||starting||bench)return;
+ const d=openTool('Import trainer','<label>Trainer username or ID<input data-trainer-query placeholder="@username or numeric trainer ID" maxlength="80"></label><button class="primary" data-trainer-search>Find trainer</button><p class="hint">Search recent public activity and chat, or enter a numeric trainer ID. Not a full leaderboard search. No wallet or login required.</p><p class="hint" data-trainer-status role="status"></p><div data-trainer-results></div><div data-trainer-profile></div><details><summary>Cannot find a ranked trainer?</summary><p>On the official League ranking page, you can copy the trainer ID from the name button using your browser’s Inspect tool (the data-who attribute). Enter it here to import their public current six.</p><p><a href="https://pokeclashleague.xyz/" target="_blank" rel="noopener">Open PokeClash League</a></p></details>');
+ const query=d.querySelector('[data-trainer-query]'),status=d.querySelector('[data-trainer-status]'),results=d.querySelector('[data-trainer-results]'),profile=d.querySelector('[data-trainer-profile]'),search=d.querySelector('[data-trainer-search]');
+ let selected=null,serial=0;
+ async function request(params){
+  const response=await fetch('/api/trainer?'+new URLSearchParams(params),{cache:'no-store',signal:AbortSignal.timeout(12000)});
+  const body=await response.json().catch(()=>null);if(!response.ok||!body)throw Error(body?.error||'Trainer service unavailable');return body;
+ }
+ async function load(id){
+  const n=++serial;selected=null;profile.replaceChildren();status.textContent='Loading trainer profile…';search.disabled=true;
+  try{
+   const p=await request({id});if(n!==serial||!d.open)return;
+   const seen=new Set();let valid=[];
+   for(const m of p.six||[]){if(!species[m.id]||seen.has(m.id)||!Number.isInteger(m.lv)||m.lv<1||m.lv>50)continue;seen.add(m.id);valid.push({...m,mega:integer(m.mega,0,species[m.id].mega.length)});}
+   if(!valid.length)throw Error('No supported public Pokémon in this trainer’s current six.');
+   if(valid.length!==(p.six||[]).length)throw Error('Some public lineup entries are incompatible with the current catalog. Import stopped rather than dropping Pokémon.');
+   selected={name:p.name,id:p.id,six:valid};
+   profile.innerHTML='<h2>@'+escape(p.name)+'</h2>'+valid.map(m=>'<div class="slot" style="display:block;padding:6px"><strong>'+escape(species[m.id].name)+'</strong> · Lv '+m.lv+(m.mega?' · '+escape(species[m.id].mega[m.mega-1]):'')+(m.shiny?' · Shiny':'')+'</div>').join('')+'<p class="hint">Public current six in returned order. Items, TMs, ability rank and tactics are not shown: imported with no items/TMs, ability rank I, and existing team tactics. Shiny is listed but not simulated. These are editable estimates, not the trainer’s verified complete build.</p><div class="form-grid"><button class="secondary" data-trainer-side="0">Replace Team A</button><button class="primary" data-trainer-side="1">Replace Team B</button></div>';
+   status.textContent='Public profile loaded.';
+  }catch(e){if(n===serial)status.textContent=e.message;}finally{if(n===serial)search.disabled=false;}
+ }
+ async function find(){
+  const v=query.value.trim().replace(/^@+/,'');if(/^\d+$/.test(v))return load(v);
+  if(v.length<2){status.textContent='Enter at least two username characters.';return;}
+  const n=++serial;selected=null;profile.replaceChildren();results.replaceChildren();status.textContent='Searching public activity…';search.disabled=true;
+  try{
+   const p=await request({q:v});if(n!==serial||!d.open)return;
+   const rows=Array.isArray(p.matches)?p.matches:[];
+   const exact=rows.filter(m=>m.name.toLowerCase()===v.toLowerCase());
+   if(exact.length===1)return load(exact[0].id);
+   status.textContent=rows.length?'Select a matching trainer.':'Not found in recent public activity. Try their trainer ID from the official ranking page.';
+   results.innerHTML=rows.map(m=>'<button class="secondary" data-trainer-id="'+escape(m.id)+'">@'+escape(m.name)+'</button>').join(' ');
+  }catch(e){if(n===serial)status.textContent=e.message;}finally{if(n===serial)search.disabled=false;}
+ }
+ search.onclick=find;query.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();find();}});
+ d.addEventListener('click',e=>{
+  const id=e.target.closest('[data-trainer-id]');if(id){load(id.dataset.trainerId);return;}
+  const b=e.target.closest('[data-trainer-side]');if(!b||!selected||running||starting||bench)return;
+  const side=Number(b.dataset.trainerSide);
+  config.teams[side]=Array.from({length:6},(_,i)=>{const m=selected.six[i];return m?{...member(m.id),lv:m.lv,mega:m.mega}:null;});
+  persist();clearBattle();d.close();
+ });
+ query.focus();
+};
