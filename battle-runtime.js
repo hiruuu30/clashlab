@@ -136,7 +136,8 @@ function createBattleRuntime({GD, VE, EconCore}) {
     if(!usable(f)||u.forceSp||u.pend||!['idle','walk'].includes(u.state))return orders;
     // Take legal actions at most every 0.2 s, without touching the underlying hit engine.
     if(game.tick-coach.last[side]<12)return orders;
-    const choose=(cmd,why)=>{coach.last[side]=game.tick;game.log(game.opt.names[side]+' AI: '+why,'info');return [cmd];};
+    coach.last[side]=game.tick;
+    const choose=(cmd,why)=>{game.log(game.opt.names[side]+' AI: '+why,'info');return [cmd];};
     if(game.canMega(side))return choose(['m'],'Mega Evolve '+u.sp.name+'.');
     const current=matchup(game,u,f),charge=state.meter>=1;
     const waited=coach.ready[side]===null?0:(game.tick-coach.ready[side])/60;
