@@ -37,15 +37,25 @@ function createBattleRuntime({GD, VE, EconCore}) {
     }
     const tactics=config.tactics.map(t=>Object.hasOwn(GD.TACTICS,t)?t:'equilibrado');
     return new VE.Battle(canvas,{
-      sim:!canvas,scene:'stadium',arena:'pvp',names:['Team A','Team B'],teams:team,plans:tactics.map(tactic=>({tactic,swap:'ordem'})),
-      ai:[Boolean(config.fullAI?.[0]),mode.kind==='arena'||Boolean(config.fullAI?.[1])],meter:true,duel:mode.kind!=='arena',seed:limit(seed,0,4294967295),
+      sim:!canvas,scene:'stadium',arena:'pvp',names:['Team A','Team B'],teams:team,plans:tactics.map((tactic,i)=>({tactic,swap:config.fullAI?.[i]||(mode.kind==='arena'&&i===1)?'vantagem':'ordem'})),
+      ai:[false,mode.kind==='arena'],meter:true,duel:mode.kind!=='arena',seed:limit(seed,0,4294967295),
       swapCd:core.CFG.arena.swapCd,maxTicks:mode.kind==='league'?core.CFG.league.live.sec*60:core.CFG.arena.maxTicks,onEvent
     });
   }
 
   function auto(game,side,enabled,orders) {
     const state=game.sides[side];
-    if (enabled && state.meter>=1) return [...orders,['f']];
+    const u=state.active, f=game.sides[1-side].active;
+    if(game.opt.ai[side])return orders; // Arena rival retains native delayed specials and native swap logic.
+    const full=game.plans[side].swap==='vantagem';
+    if(!u||u.ko||['enter','recall','faint'].includes(u.state))return orders;
+    if(full && f && !f.ko && u.state==='idle' && !u.forceSp && !(state.swapT>0) && game.tick%30===0){
+      const score=m=>GD.atkEff(m.types,f.types)*2-GD.atkEff(f.types,m.types)+m.hp/m.max*0.3;
+      const candidates=state.team.filter(m=>m!==u&&!m.ko).sort((a,b)=>score(b)-score(a));
+      const best=candidates[0];
+      if(best && score(best)>score(u)+0.75 && (GD.atkEff(f.types,u.types)>1 || u.hp/u.max<0.35))return [...orders,['s',best.slot]];
+    }
+    if ((enabled||full) && state.meter>=1 && !u.forceSp) return [...orders,['f']];
     return orders;
   }
   function apply(game, automatic, orders=[[],[]]) {
