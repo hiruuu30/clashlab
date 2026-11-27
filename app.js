@@ -9,7 +9,7 @@ const sides = ['a','b'];
 const title = side => 'Team '+sides[side].toUpperCase();
 const member = id => ({id,lv:50,ability:1,item:'',mega:0,tms:[{k:'',lv:1},{k:'',lv:1}]});
 const integer = (value,min,max) => Math.min(max,Math.max(min,Number.isFinite(Number(value))?Math.trunc(Number(value)):min));
-const initial = () => ({teams:presets.map(x=>x.map(member)),tactics:['equilibrado','equilibrado'],mode:'sandbox',seed:498271,automatic:[true,true]});
+const initial = () => ({teams:presets.map(x=>x.map(member)),tactics:['equilibrado','equilibrado'],mode:'sandbox',seed:498271,automatic:[true,true],fullAI:[false,false]});
 let config = initial();
 let workers;
 let catalog;
@@ -42,7 +42,7 @@ function portrait(id, alternate, mood='Normal') {
   return typeof src==='string' && src.startsWith('data:image/png;base64,') ? src : './mark.svg';
 }
 function requestPortraits() {
-  const ids=[...new Set([...config.teams.flat().filter(Boolean).map(slot=>slot.id),...Array.from(document.querySelectorAll('#dex-results [data-portrait]'),img=>img.dataset.portrait)])]
+  const ids=[...new Set([...config.teams.flat().filter(Boolean).map(slot=>slot.id),...Array.from(document.querySelectorAll('dialog[open] [data-portrait], #dex-results [data-portrait]'),img=>img.dataset.portrait)])]
     .filter(id=>!window.PORTRAITS?.[id] && !portraitRequests.has(id));
   if(!ids.length)return;
   ids.forEach(id=>portraitRequests.add(id));
@@ -75,6 +75,7 @@ function restore() {
   clean.seed=integer(saved.seed,0,4294967295);
   clean.tactics=clean.tactics.map((fallback,i)=>tactic.some(([key])=>key===saved.tactics?.[i])?saved.tactics[i]:fallback);
   clean.automatic=clean.automatic.map((_,i)=>saved.automatic?.[i]!==false);
+  clean.fullAI=clean.fullAI.map((_,i)=>saved.fullAI?.[i]===true);
   clean.teams=clean.teams.map((base,i)=>Array.isArray(saved.teams[i])?Array.from({length:6},(_,j)=>{
     const x=saved.teams[i][j];
     if(!x || !species[x.id])return null;
@@ -136,6 +137,7 @@ function renderTeam(i) {
   const target=$('team-'+sides[i]);
   const current=live?.sides?.[i];
   const isArenaOpponent=mode().kind==='arena'&&i===1;
+  const aiControlled=isArenaOpponent||config.fullAI[i];
   const locked=running||bench||starting;
   let memberIndex=0;
   const list=config.teams[i].map((slot,index)=>{
@@ -147,10 +149,10 @@ function renderTeam(i) {
     const displayed=mon?.name || (slot.mega?s.mega[slot.mega-1]:s.name);
     const details='Lv '+(mon?.lv ?? levelFor(slot))+(live?'':' · '+s.types.map(t=>catalog.types[t]).join('/')+(items[slot.item]?' · '+items[slot.item].name:''));
     const action=(running?'Switch to ':'Edit ')+s.name;
-    return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,isArenaOpponent):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
+    return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,aiControlled):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
       +(locked?'':'<div class="slot-buttons"><button data-reorder="'+index+',-1" aria-label="Move '+escape(s.name)+' up"'+disabled(index===0)+'>↑</button><button data-reorder="'+index+',1" aria-label="Move '+escape(s.name)+' down"'+disabled(index===5)+'>↓</button></div>')+'</div>';
   }).join('');
-  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(isArenaOpponent||bench||starting)+'>'+options([['on',isArenaOpponent?'Game AI':'Auto Special'],['off','Manual Special']],isArenaOpponent||config.automatic[i]?'on':'off')+'</select></label></div>';
+  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(aiControlled||bench||starting)+'>'+options([['on',isArenaOpponent?'Game AI':'Auto Special'],['off','Manual Special']],aiControlled||config.automatic[i]?'on':'off')+'</select></label><label class="auto-toggle" title="Use the upstream engine AI for this team from the next battle"><input type="checkbox" data-full-ai'+(config.fullAI[i]||isArenaOpponent?' checked':'')+disabled(locked||isArenaOpponent)+'> Auto battle</label></div>';
 }
 
 function updateHp(bar,mon) {
@@ -177,7 +179,7 @@ function updateLiveTeam(i) {
     }
   }
   previous.dataset.hp=hp;
-  const isArenaOpponent=mode().kind==='arena'&&i===1;
+  const isArenaOpponent=(mode().kind==='arena'&&i===1)||config.fullAI[i];
   for(const button of panel.querySelectorAll('[data-swap]')) {
     const index=Number(button.dataset.swap);
     const member=current.team[index];
@@ -209,7 +211,7 @@ function updateBattleActions() {
   sides.forEach((_,i)=>{
     const panel=actions.children[i];
     const state=live.sides[i];
-    const ai=mode().kind==='arena'&&i===1;
+    const ai=(mode().kind==='arena'&&i===1)||config.fullAI[i];
     const charge=Math.floor((state.meter||0)*100);
     const special=panel.querySelector('.pv-sp');
     const ready=state.canSpecial&&!ai&&!finishing;
@@ -403,7 +405,7 @@ $('finish').onclick=()=>{
 };
 $('battle-actions').onclick=event=>{
   const button=event.target.closest('button[data-command]');
-  if(button && running && !finishing)arena.order(Number(button.dataset.side),[button.dataset.command]);
+  if(button && running && !finishing && !config.fullAI[Number(button.dataset.side)])arena.order(Number(button.dataset.side),[button.dataset.command]);
 };
 $('benchmark').onclick=()=>{
   if(bench){workers.postMessage({type:'cancel-benchmark'});bench=false;renderTeams();show();$('result').textContent='Benchmark cancelled.';return;}
@@ -415,7 +417,7 @@ $('benchmark').onclick=()=>{
 function advance(ticks){
   if(!running)return;
   try {
-    const state=arena.advance(ticks,config.automatic,!finishing);
+    const state=arena.advance(ticks,config.automatic.map((on,i)=>on&&!config.fullAI[i]),!finishing);
     handle(state);
     if(state.knockout && !finishing && !state.over)showKnockout(state.knockout);
     if(!finishing || !running)arena.draw();
@@ -452,11 +454,12 @@ for(let i=0;i<2;i++){
       [config.teams[i][from],config.teams[i][to]]=[config.teams[i][to],config.teams[i][from]];
       persist();clearBattle();
     }
-    if(running && !finishing && button.dataset.swap!==undefined)arena.order(i,['s',Number(button.dataset.swap)]);
+    if(running && !finishing && !config.fullAI[i] && button.dataset.swap!==undefined)arena.order(i,['s',Number(button.dataset.swap)]);
   });
   panel.addEventListener('change',e=>{
     if(e.target.hasAttribute('data-tactic'))config.tactics[i]=e.target.value;
     if(e.target.hasAttribute('data-auto'))config.automatic[i]=e.target.value==='on';
+    if(e.target.hasAttribute('data-full-ai')&&!running&&!starting&&!bench){config.fullAI[i]=e.target.checked;renderTeam(i);}
     persist();
   });
 }
@@ -530,7 +533,7 @@ dex.style.width='min(850px,calc(100% - 24px))';
 dex.innerHTML='<header class="dialog-head"><h2>ClashDex</h2><button class="icon-btn" data-close>×</button></header><div class="editor-fields"><input id="dex-query" type="search" placeholder="Search name, ability or TM"><div class="form-grid"><label>Rarity<select id="dex-rarity"></select></label><label>Type<select id="dex-type"></select></label><label>Role<select id="dex-role"></select></label><label>Sort<select id="dex-sort"><option value="name">Name</option><option value="coverage">Type diversity</option><option value="learn">TM versatility</option><option value="mega">Mega options</option><option value="id">Dex number</option></select></label></div><label><span><input type="checkbox" id="dex-mega"> Mega available only</span></label><p id="dex-count" class="hint"></p><div id="dex-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px"></div><button class="secondary" id="dex-more">Show more</button></div>';
 document.body.append(dex);
 const toolsBar=document.createElement('div');toolsBar.className='actions';toolsBar.style.flexWrap='wrap';
-toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button>';
+toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="presets-open">Saved teams</button>';
 document.querySelector('.setup').append(toolsBar);
 let dexLimit=36;
 function dexRender(){
@@ -561,3 +564,26 @@ function updateEquipmentHints(){
 }
 editor.addEventListener('change',updateEquipmentHints);
 new MutationObserver(()=>{if(editor.open)updateEquipmentHints();}).observe(editor,{attributes:true,attributeFilter:['open']});
+
+function openTool(label,body){
+ const d=document.createElement('dialog');d.style.width='min(720px,calc(100% - 24px))';
+ d.innerHTML='<header class="dialog-head"><h2>'+escape(label)+'</h2><button class="icon-btn" aria-label="Close">×</button></header><div class="editor-fields">'+body+'</div>';
+ document.body.append(d);d.querySelector('button').onclick=()=>d.close();d.onclose=()=>d.remove();d.showModal();return d;
+}
+$('compare-open').onclick=()=>{
+ if(!catalog)return;
+ const list=catalog.species.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
+ const d=openTool('Pokémon comparison','<div class="form-grid"><label>First Pokémon<select data-first>'+options(list,config.teams[0].find(Boolean)?.id)+'</select></label><label>Second Pokémon<select data-second>'+options(list,config.teams[1].find(Boolean)?.id)+'</select></label></div><div data-comparison class="form-grid"></div><p class="hint">Live catalog attributes, not simulated win probabilities.</p>');
+ const draw=()=>{d.querySelector('[data-comparison]').innerHTML=['first','second'].map(k=>{const p=species[d.querySelector('[data-'+k+']').value];return '<section class="slot" style="display:block;padding:10px"><img data-portrait="'+escape(p.id)+'" src="'+portrait(p.id)+'" alt="" width="72" height="72"><h2>'+escape(p.name)+'</h2><p>'+escape(p.rarity+' · '+p.role)+'</p><p>Type: '+escape(p.types.map(t=>catalog.types[t]).join(' / '))+'</p><p>Ability: '+escape(p.ability)+'</p><p>Innate: '+escape(catalog.skills[p.innate]||p.innate)+'</p><p>Compatible TMs ('+p.learn.length+'): '+escape(p.learn.map(k=>catalog.skills[k]||k).join(', '))+'</p><p>Mega: '+escape(p.mega.join(', ')||'None')+'</p></section>';}).join('');requestPortraits();};
+ d.addEventListener('change',draw);draw();
+};
+function savedTeams(){try{const a=JSON.parse(localStorage.getItem('clashlab-presets')||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
+$('presets-open').onclick=()=>{
+ if(!catalog||running||starting||bench)return;
+ const d=openTool('Saved team setups','<label>Preset name<input data-name maxlength="60" placeholder="My competitive team"></label><button class="primary" data-save>Save current setup</button><div data-list></div><p class="hint" data-note>Saved in this browser.</p>');
+ const render=()=>{d.querySelector('[data-list]').innerHTML=savedTeams().map((p,i)=>'<div class="slot" style="padding:7px"><span>'+escape(p.name)+'</span><span><button class="quiet" data-load="'+i+'">Load</button><button class="quiet" data-delete="'+i+'">Delete</button></span></div>').join('')||'No saved setups.';};
+ d.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;try{let list=savedTeams();if(b.hasAttribute('data-save')){const name=d.querySelector('[data-name]').value.trim();if(!name)return;list.push({name,config:structuredClone(config)});localStorage.setItem('clashlab-presets',JSON.stringify(list));render();}else if(b.dataset.delete!==undefined){list.splice(Number(b.dataset.delete),1);localStorage.setItem('clashlab-presets',JSON.stringify(list));render();}else if(b.dataset.load!==undefined){const p=list[Number(b.dataset.load)];if(!p)return;localStorage.setItem('clashlab-1',JSON.stringify(p.config));restore();$('rules').value=config.mode;$('seed').value=config.seed;persist();clearBattle();d.close();}}catch(err){d.querySelector('[data-note]').textContent=err.message;}});
+ render();
+};
+const logExport=document.createElement('button');logExport.className='quiet';logExport.textContent='Export log';document.querySelector('.log-head').append(logExport);
+logExport.onclick=()=>{if(!events.length)return;const url=URL.createObjectURL(new Blob([events.map(e=>clock(e.tick)+' '+e.text).join('\n')],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='clashlab-battle-log.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
