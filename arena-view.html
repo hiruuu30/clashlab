@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clash Arena</title>
+<base href="https://pokeclashleague.xyz/">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+  html, body { width: 100%; height: 100%; margin: 0; background: #0d0f1f; overflow: hidden }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated }
+</style>
+<script>window.PKC_PVP = true;</script>
+<script defer src="i18n.js"></script>
+<script defer src="ui.js"></script>
+<script defer src="dex.js"></script>
+<script defer src="evo.js"></script>
+<script defer src="trainers.js"></script>
+<script defer src="people.js"></script>
+<script defer src="learn.js"></script>
+<script defer src="mega.js"></script>
+<script defer src="forms.js"></script>
+<script defer src="data.js"></script>
+<script defer src="arena.js"></script>
+<script defer src="engine.js"></script>
+<script defer src="pfx.js"></script>
+<script defer src="gba-art.js"></script>
+<script defer src="econ-core.js"></script>
+</head>
+<body>
+<canvas id="arena" width="1600" height="1000" aria-label="Animated PokeClash League battlefield"></canvas>
+<script type="module">
+  import(new URL('./arena-view.js', location.href));
+</script>
+</body>
+</html>

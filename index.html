@@ -6,6 +6,7 @@
 <meta name="description" content="Build teams and test real-time PvP matchups with the PokeClash League battle engine.">
 <link rel="icon" href="./mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./style.css">
+<script defer src="https://pokeclashleague.xyz/ui.js"></script>
 <title>ClashLab · PokeClash League Battle Simulator</title>
 </head>
 <body>
@@ -26,29 +27,36 @@
       <label>Benchmark runs <select id="benchmark-count"><option>10</option><option selected>50</option><option>100</option><option>250</option><option>500</option></select></label><div class="actions"><button id="benchmark" class="secondary">Run benchmark</button><button id="start" class="primary"><span aria-hidden="true">▶</span> Start battle</button></div>
     </section>
     <section class="lab" aria-label="Teams and battlefield">
+      <header class="match-head">
+        <div class="score team-a-score"><b>Team A</b><span class="markers" id="markers-a" aria-hidden="true"></span><span id="count-a"></span></div>
+        <div class="clock"><output id="clock" aria-label="Battle clock">0:00</output><p id="match-caption">Set your teams to begin</p></div>
+        <div class="score team-b-score"><span id="count-b"></span><span class="markers" id="markers-b" aria-hidden="true"></span><b>Team B</b></div>
+      </header>
       <aside id="team-a" class="team team-a"></aside>
       <section class="match" aria-label="Battlefield">
-        <header class="match-head"><div><h2>Battlefield</h2><p id="match-caption">Set your teams to begin</p></div><output id="clock">0:00</output></header>
-        <div class="field" id="field">
-          <div class="grid-plane"></div><div class="center-line"></div>
-          <div class="versus"><span></span><b>VS</b><span></span></div>
-          <div id="fighter-a" class="fighter"></div><div id="fighter-b" class="fighter"></div>
+        <div class="field">
+          <iframe id="arena-frame" title="Animated PokeClash League battlefield" src="./arena-view.html" tabindex="-1"></iframe>
+          <div id="knockout" class="knockout" hidden aria-hidden="true"></div>
+          <p id="arena-message" role="status">Loading the arena…</p>
         </div>
-        <div class="transport">
-          <button class="secondary" id="pause" disabled>Pause</button><button class="secondary" id="step" disabled>Step 1s</button>
-          <label class="speed">Speed <select id="speed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
-          <button class="quiet" id="finish" disabled>Finish</button>
-        </div>
-        <div class="result" id="result" aria-live="polite" hidden></div>
       </section>
       <aside id="team-b" class="team team-b"></aside>
-    </section>
-    <section class="log-panel" aria-label="Battle log">
-      <div class="log-head"><div><h2>Battle log</h2><p>Switches, hits, Specials, and knockouts.</p></div><label>Show <select id="log-filter"><option value="all">All events</option><option value="key">Key moments</option></select></label></div>
-      <div id="log" class="log" tabindex="0"><p class="empty-log">Start a battle to see how it plays out.</p></div>
+      <div id="battle-actions" class="battle-actions" hidden></div>
+      <div class="match-tools">
+        <div class="transport">
+          <button class="secondary" id="pause" disabled>Pause</button><button class="secondary" id="step" disabled>Step 1s</button>
+          <label class="speed">Speed <select id="speed"><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
+          <button class="secondary" id="finish" disabled>Finish</button>
+        </div>
+        <div class="result" id="result" aria-live="polite" hidden></div>
+      </div>
+      <section class="log-panel" aria-label="Battle log">
+        <div class="log-head"><h2>Battle log</h2><label>Show <select id="log-filter"><option value="all">All events</option><option value="key">Key moments</option></select></label></div>
+        <div id="log" class="log" tabindex="0"><p class="empty-log">Start a battle to see how it plays out.</p></div>
+      </section>
     </section>
   </div>
-  <footer class="legal">Unofficial PokeClash League simulator · Local battles and teams · <a href="https://pokeclashleague.xyz/" target="_blank" rel="noopener">PokeClash League</a></footer>
+  <footer class="legal">Unofficial PokeClash League simulator · Local battles · <a href="https://pokeclashleague.xyz/" target="_blank" rel="noopener">PokeClash League</a> · <a href="https://github.com/PMDCollab/SpriteCollab" target="_blank" rel="noopener">SpriteCollab artists</a> (<a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>) · <a href="https://pokeclashleague.xyz/#credits" target="_blank" rel="noopener">Game asset credits</a></footer>
 </main>
 <dialog id="editor"><form method="dialog" id="editor-form">
   <header class="dialog-head"><div><h2>Edit Pokémon</h2><p id="slot-label"></p></div><button value="cancel" formnovalidate class="icon-btn" aria-label="Close editor">×</button></header>
