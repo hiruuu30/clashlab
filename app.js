@@ -9,7 +9,7 @@ const sides = ['a','b'];
 const title = side => 'Team '+sides[side].toUpperCase();
 const member = id => ({id,lv:50,ability:1,item:'',mega:0,tms:[{k:'',lv:1},{k:'',lv:1}]});
 const integer = (value,min,max) => Math.min(max,Math.max(min,Number.isFinite(Number(value))?Math.trunc(Number(value)):min));
-const initial = () => ({teams:presets.map(x=>x.map(member)),tactics:['equilibrado','equilibrado'],mode:'sandbox',seed:498271,automatic:[true,true],fullAI:[false,false]});
+const initial = () => ({teams:presets.map(x=>x.map(member)),tactics:['equilibrado','equilibrado'],mode:'sandbox',seed:498271,automatic:[true,true],fullAI:[true,true],autoBattleVersion:2});
 let config = initial();
 let workers;
 let catalog;
@@ -75,7 +75,7 @@ function restore() {
   clean.seed=integer(saved.seed,0,4294967295);
   clean.tactics=clean.tactics.map((fallback,i)=>tactic.some(([key])=>key===saved.tactics?.[i])?saved.tactics[i]:fallback);
   clean.automatic=clean.automatic.map((_,i)=>saved.automatic?.[i]!==false);
-  clean.fullAI=clean.fullAI.map((_,i)=>saved.fullAI?.[i]===true);
+  clean.fullAI=clean.fullAI.map((_,i)=>saved.autoBattleVersion===2?saved.fullAI?.[i]!==false:true);
   clean.teams=clean.teams.map((base,i)=>Array.isArray(saved.teams[i])?Array.from({length:6},(_,j)=>{
     const x=saved.teams[i][j];
     if(!x || !species[x.id])return null;
@@ -152,7 +152,7 @@ function renderTeam(i) {
     return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,aiControlled):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
       +(locked?'':'<div class="slot-buttons"><button data-reorder="'+index+',-1" aria-label="Move '+escape(s.name)+' up"'+disabled(index===0)+'>↑</button><button data-reorder="'+index+',1" aria-label="Move '+escape(s.name)+' down"'+disabled(index===5)+'>↓</button></div>')+'</div>';
   }).join('');
-  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(aiControlled||bench||starting)+'>'+options([['on',aiControlled?'Auto battle active':'Auto Special'],['off','Manual Special']],aiControlled||config.automatic[i]?'on':'off')+'</select></label><label class="auto-toggle" title="Auto special and cooldown-aware type switching; dodges and Mega are native engine mechanics"><input type="checkbox" data-full-ai'+(config.fullAI[i]||isArenaOpponent?' checked':'')+disabled(locked||isArenaOpponent)+'> Auto battle</label></div>';
+  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(aiControlled||bench||starting)+'>'+options([['on',aiControlled?'Auto battle active':'Auto Special'],['off','Manual Special']],aiControlled||config.automatic[i]?'on':'off')+'</select></label><label class="auto-toggle" title="Smart AI chooses swaps, specials, Mega timing and replacements. Turn off to control this team manually; dodges are passive."><input type="checkbox" data-full-ai'+(config.fullAI[i]||isArenaOpponent?' checked':'')+disabled(locked||isArenaOpponent)+'> Auto battle</label></div>';
 }
 
 function updateHp(bar,mon) {
