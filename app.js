@@ -533,7 +533,7 @@ dex.style.width='min(850px,calc(100% - 24px))';
 dex.innerHTML='<header class="dialog-head"><h2>ClashDex</h2><button class="icon-btn" data-close>×</button></header><div class="editor-fields"><input id="dex-query" type="search" placeholder="Search name, ability or TM"><div class="form-grid"><label>Rarity<select id="dex-rarity"></select></label><label>Type<select id="dex-type"></select></label><label>Role<select id="dex-role"></select></label><label>Sort<select id="dex-sort"><option value="name">Name</option><option value="coverage">Type diversity</option><option value="learn">TM versatility</option><option value="mega">Mega options</option><option value="id">Dex number</option></select></label></div><label><span><input type="checkbox" id="dex-mega"> Mega available only</span></label><p id="dex-count" class="hint"></p><div id="dex-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px"></div><button class="secondary" id="dex-more">Show more</button></div>';
 document.body.append(dex);
 const toolsBar=document.createElement('div');toolsBar.className='actions';toolsBar.style.flexWrap='wrap';
-toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="presets-open">Saved teams</button>';
+toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button>';
 document.querySelector('.setup').append(toolsBar);
 let dexLimit=36;
 function dexRender(){
@@ -587,3 +587,57 @@ $('presets-open').onclick=()=>{
 };
 const logExport=document.createElement('button');logExport.className='quiet';logExport.textContent='Export log';document.querySelector('.log-head').append(logExport);
 logExport.onclick=()=>{if(!events.length)return;const url=URL.createObjectURL(new Blob([events.map(e=>clock(e.tick)+' '+e.text).join('\n')],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='clashlab-battle-log.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+
+/* Standard Pokémon type-chart reference. Not asserted to match PokeClash damage rules. */
+const referenceChart={"normal":[[],["rock","steel"],["ghost"]],"fire":[["grass","ice","bug","steel"],["fire","water","rock","dragon"],[]],"water":[["fire","ground","rock"],["water","grass","dragon"],[]],"electric":[["water","flying"],["electric","grass","dragon"],["ground"]],"grass":[["water","ground","rock"],["fire","grass","poison","flying","bug","dragon","steel"],[]],"ice":[["grass","ground","flying","dragon"],["fire","water","ice","steel"],[]],"fighting":[["normal","ice","rock","dark","steel"],["poison","flying","psychic","bug","fairy"],["ghost"]],"poison":[["grass","fairy"],["poison","ground","rock","ghost"],["steel"]],"ground":[["fire","electric","poison","rock","steel"],["grass","bug"],["flying"]],"flying":[["grass","fighting","bug"],["electric","rock","steel"],[]],"psychic":[["fighting","poison"],["psychic","steel"],["dark"]],"bug":[["grass","psychic","dark"],["fire","fighting","poison","flying","ghost","steel","fairy"],[]],"rock":[["fire","ice","flying","bug"],["fighting","ground","steel"],[]],"ghost":[["psychic","ghost"],["dark"],["normal"]],"dragon":[["dragon"],["steel"],["fairy"]],"dark":[["psychic","ghost"],["fighting","dark","fairy"],[]],"steel":[["ice","rock","fairy"],["fire","water","electric","steel"],[]],"fairy":[["fighting","dragon","dark"],["fire","poison","steel"],[]]};
+const refTypes=Object.keys(referenceChart);
+const typeNames=p=>p.types.map(t=>String(catalog.types[t]||t).toLowerCase().trim());
+const supported=p=>p&&typeNames(p).length>0&&typeNames(p).every(t=>Object.hasOwn(referenceChart,t));
+function effectiveness(a,targets){
+ return targets.reduce((v,t)=>{const row=referenceChart[a];return v*(row[2].includes(t)?0:row[0].includes(t)?2:row[1].includes(t)?0.5:1);},1);
+}
+function offense(p,op){return Math.max(...typeNames(p).map(t=>effectiveness(t,typeNames(op))));}
+function coverage(p){return refTypes.filter(t=>typeNames(p).some(a=>effectiveness(a,[t])>1)).length;}
+function resistCount(p){return refTypes.filter(t=>effectiveness(t,typeNames(p))<1).length;}
+function threatCount(p){return refTypes.filter(t=>effectiveness(t,typeNames(p))>1).length;}
+const referenceNote='Standard Pokémon type-chart reference only. PokeClash may differ in multipliers, moves, abilities and combat rules. Not a win-rate or damage prediction.';
+const speciesOptions=()=>catalog.species.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
+const rarityOptions=()=>[['','All rarities'],...Array.from(new Set(catalog.species.map(p=>p.rarity))).sort().map(r=>[r,r])];
+function metricText(value){return value+'×';}
+function cardName(p){return '<img data-portrait="'+escape(p.id)+'" src="'+portrait(p.id)+'" alt="" width="42" height="42" style="vertical-align:middle;margin-right:8px"><strong>'+escape(p.name)+'</strong> <small>'+escape(p.rarity+' · '+p.role)+'</small>';}
+$('counter-open').onclick=()=>{
+ if(!catalog)return;
+ const d=openTool('Counter Finder','<div class="form-grid"><label>Opponent<select data-target>'+options(speciesOptions(),config.teams[1].find(Boolean)?.id)+'</select></label><label>Rarity<select data-rarity>'+options(rarityOptions(),'')+'</select></label></div><label><span><input type="checkbox" data-defensive> Resist incoming types only</span></label><p class="hint">'+escape(referenceNote)+'</p><div data-results></div>');
+ function draw(){const opponent=species[d.querySelector('[data-target]').value],rarity=d.querySelector('[data-rarity]').value;
+ const results=d.querySelector('[data-results]');if(!supported(opponent)){results.textContent='Type reference unavailable for this opponent.';return;}
+ const rows=catalog.species.filter(p=>p.id!==opponent.id&&supported(p)&&(!rarity||p.rarity===rarity)).map(p=>({p,attack:offense(p,opponent),incoming:offense(opponent,p)})).filter(r=>!d.querySelector('[data-defensive]').checked||r.incoming<1);
+ rows.sort((a,b)=>(b.attack-a.attack)||(a.incoming-b.incoming)||b.p.learn.length-a.p.learn.length||a.p.name.localeCompare(b.p.name));
+ results.innerHTML='<p class="hint">'+rows.length+' candidates · highest offensive matchup first, then lowest incoming type multiplier</p>'+rows.slice(0,40).map(({p,attack,incoming},i)=>'<div class="slot" style="display:block;padding:8px"><span>#'+(i+1)+' </span>'+cardName(p)+'<p>Outgoing type '+metricText(attack)+' · Incoming type '+metricText(incoming)+'</p><p class="hint">'+escape(typeNames(p).join(' / '))+'</p></div>').join('');
+ requestPortraits();
+ }
+ d.addEventListener('change',draw);draw();};
+$('rank-open').onclick=()=>{
+ if(!catalog)return;
+ const d=openTool('Rarity rankings','<div class="form-grid"><label>Rarity<select data-rarity>'+options(rarityOptions().slice(1),catalog.species[0]?.rarity)+'</select></label><label>Rank by<select data-metric><option value="coverage">Type coverage (reference)</option><option value="resist">Type resistances (reference)</option><option value="tm">TM versatility (game catalog)</option><option value="mega">Mega options (game catalog)</option></select></label></div><p class="hint">Rankings reflect the selected attribute, not overall combat strength. '+escape(referenceNote)+'</p><div data-results></div>');
+ function draw(){const rarity=d.querySelector('[data-rarity]').value,m=d.querySelector('[data-metric]').value;
+ const score=p=>m==='tm'?p.learn.length:m==='mega'?p.mega.length:m==='resist'?resistCount(p):coverage(p);
+ const rows=catalog.species.filter(p=>p.rarity===rarity&&(['tm','mega'].includes(m)||supported(p))).map(p=>({p,value:score(p)})).sort((a,b)=>b.value-a.value||a.p.name.localeCompare(b.p.name));
+ let rank=0,last=null;
+ d.querySelector('[data-results]').innerHTML=rows.slice(0,60).map(({p,value},i)=>{if(value!==last)rank=i+1;last=value;return '<div class="slot" style="display:block;padding:8px">#'+rank+' '+cardName(p)+'<p>Score: '+value+'</p></div>';}).join('')||'No matching Pokémon.';requestPortraits();}
+ d.addEventListener('change',draw);draw();};
+$('team-inspect').onclick=()=>{
+ if(!catalog)return;
+ const d=openTool('Team analyzer','<label>Roster<select data-side><option value="0">Team A</option><option value="1">Team B</option></select></label><p class="hint">'+escape(referenceNote)+'</p><div data-results></div>');
+ function draw(){const i=Number(d.querySelector('[data-side]').value), roster=config.teams[i].filter(Boolean).map(m=>species[m.id]),valid=roster.filter(supported);
+ const stats=refTypes.map(t=>({t,weak:valid.filter(p=>effectiveness(t,typeNames(p))>1),resist:valid.filter(p=>effectiveness(t,typeNames(p))<1),hits:valid.filter(p=>typeNames(p).some(a=>effectiveness(a,[t])>1))})).sort((a,b)=>(b.weak.length-b.resist.length)-(a.weak.length-a.resist.length));
+ d.querySelector('[data-results]').innerHTML='<h2>'+escape(title(i))+'</h2><p>'+valid.length+'/'+roster.length+' members with recognized reference types.</p><p>Offensive coverage: '+stats.filter(t=>t.hits.length).length+' / '+refTypes.length+' single types</p><p>Uncovered shared weaknesses: '+escape(stats.filter(t=>t.weak.length&&!t.resist.length).map(t=>t.t).join(', ')||'None')+'</p>'+stats.map(t=>'<div class="slot" style="display:block;padding:7px"><strong>'+escape(t.t.toUpperCase())+'</strong><p>Weak: '+t.weak.length+' · Resist/immune: '+t.resist.length+' · Can hit super effectively by type: '+t.hits.length+'</p><small>'+escape(t.weak.map(p=>p.name).join(', '))+'</small></div>').join('');
+ }d.addEventListener('change',draw);draw();};
+$('build-open').onclick=()=>{
+ if(!catalog||running||starting||bench)return;
+ const entries=config.teams.flatMap((t,i)=>t.flatMap((m,j)=>m?[[i+':'+j,title(i)+' · '+species[m.id].name]]:[]));
+ if(!entries.length){notify('Add Pokémon before using Build Advisor.');return;}
+ const d=openTool('Build Advisor','<label>Team Pokémon<select data-member>'+options(entries,entries[0][0])+'</select></label><p class="hint">Ranks held items by actual effective level under the selected ruleset; not overall combat power. TM effects and damage are not scored.</p><div data-results></div>');
+ function draw(){const [i,j]=d.querySelector('[data-member]').value.split(':').map(Number),m=config.teams[i][j],p=species[m.id],baseline=levelFor({...m,item:''});
+ const rows=catalog.items.map(it=>({it,lv:levelFor({...m,item:String(it.k)})})).sort((a,b)=>b.lv-a.lv||a.it.name.localeCompare(b.it.name));
+ d.querySelector('[data-results]').innerHTML='<h2>'+escape(p.name)+'</h2><p>No item: Lv '+baseline+' · Current build: Lv '+levelFor(m)+'</p><h2>Held items by effective level</h2>'+rows.slice(0,15).map(({it,lv})=>'<div class="slot" style="padding:7px"><span>'+escape(it.name)+' · Lv '+lv+' (+'+(lv-baseline)+')</span><button class="quiet" data-equip="'+escape(it.k)+'">Equip</button></div>').join('')+'<h2>Compatible TMs</h2><p>'+escape(p.learn.filter(k=>k!==p.innate).map(k=>catalog.skills[k]||k).join(', ')||'None')+'</p><p class="hint">Second TM unlocks at Lv 12. Use the Pokémon editor to select ranks and moves.</p>';
+ }d.addEventListener('change',draw);d.addEventListener('click',e=>{const b=e.target.closest('[data-equip]');if(!b||running||starting||bench)return;const [i,j]=d.querySelector('[data-member]').value.split(':').map(Number);if(!items[b.dataset.equip])return;config.teams[i][j].item=b.dataset.equip;persist();clearBattle();draw();});draw();};
