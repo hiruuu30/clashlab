@@ -38,7 +38,7 @@ function createBattleRuntime({GD, VE, EconCore}) {
     const tactics=config.tactics.map(t=>Object.hasOwn(GD.TACTICS,t)?t:'equilibrado');
     return new VE.Battle(canvas,{
       sim:!canvas,scene:'stadium',arena:'pvp',names:['Team A','Team B'],teams:team,plans:tactics.map(tactic=>({tactic,swap:'ordem'})),
-      ai:[false,false],meter:true,duel:mode.kind!=='arena',seed:limit(seed,0,4294967295),
+      ai:[Boolean(config.fullAI?.[0]),mode.kind==='arena'||Boolean(config.fullAI?.[1])],meter:true,duel:mode.kind!=='arena',seed:limit(seed,0,4294967295),
       swapCd:core.CFG.arena.swapCd,maxTicks:mode.kind==='league'?core.CFG.league.live.sec*60:core.CFG.arena.maxTicks,onEvent
     });
   }
