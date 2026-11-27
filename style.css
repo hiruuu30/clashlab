@@ -420,3 +420,112 @@ dialog::backdrop { background: #080a18c9; }
     to { transform: scale(1); opacity: 1; }
   }
 }
+
+
+/* ClashLab responsive UI polish: retain the original PokeClash art and pixel frames. */
+.lab-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;position:relative;z-index:5}
+.lab-tools>.secondary,.tool-menu>summary{min-height:44px;padding:10px 14px;display:flex;align-items:center;gap:7px;border:2px solid #6975ab;background:#30375d;box-shadow:inset 0 -3px #202448;font-size:20px;cursor:pointer}
+.dex-launch span{font-size:14px;color:var(--dim)}
+.tool-menu{position:relative;min-width:0}
+.tool-menu>summary{list-style:none}
+.tool-menu>summary::-webkit-details-marker{display:none}
+.tool-menu>summary::after{content:'▾';margin-left:auto;color:var(--yellow)}
+.tool-menu[open]>summary::after{content:'▴'}
+.tool-menu-content{position:absolute;top:calc(100% + 5px);left:0;min-width:210px;display:grid;gap:4px;background:var(--deep);border:2px solid #6975ab;padding:6px;box-shadow:0 6px 18px #0009;z-index:9}
+.tool-menu-content button{text-align:left;min-height:44px}
+.setup{align-items:end;gap:12px;padding:12px 14px}
+.setup>label:first-child{flex:1;min-width:175px}
+.setup>.actions{flex:0 0 auto;margin-left:auto}
+#start{min-height:44px;padding-inline:22px;font-size:22px}
+#rules{width:100%;min-height:44px}
+.seed-control input{min-height:44px}
+.lab{grid-template-columns:minmax(210px,1fr) minmax(0,3fr) minmax(210px,1fr);gap:16px}
+.team-head{min-height:36px}
+.team-head h2{font-size:12px}
+.team-head select{min-height:34px}
+.team-controls{flex-direction:column;align-items:stretch;gap:6px;padding:6px;background:#181c31;border:1px solid var(--line)}
+.team-controls label{min-width:0}
+.team-controls select{width:100%;min-height:36px;font-size:17px}
+.auto-toggle{display:flex;align-items:center;gap:8px;min-height:38px;cursor:pointer}
+input[type=checkbox]{min-height:0;width:20px;height:20px;accent-color:var(--yellow);flex:none;margin:0}
+.slot-main{min-height:45px;gap:7px;padding:3px}
+.slot-main img{width:36px;height:36px;flex:none}
+.slot-content strong{font-size:19px}
+.slot-content small{font-size:15px}
+.slot-buttons button{min-width:25px;min-height:38px}
+.slot-buttons button:focus-visible{outline-offset:0}
+.active-heading strong{font-size:10px}
+.active-heading b{white-space:nowrap}
+.buffs{flex-wrap:wrap}
+.buffs span{overflow-wrap:anywhere}
+.log-head{flex-wrap:wrap}
+.log-head .quiet{font-size:16px;min-height:32px;padding:3px 7px}
+dialog{max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;box-shadow:0 16px 70px #0009}
+.dialog-head{position:sticky;top:0;z-index:2;background:var(--panel);gap:12px}
+.dialog-head h2{font-size:12px;overflow-wrap:anywhere}
+.dialog-head .icon-btn{min-width:44px;min-height:44px;flex:none}
+.dialog-actions{position:sticky;bottom:0;z-index:2;background:var(--panel)}
+.dialog-actions button{min-height:44px}
+.editor-fields{gap:12px;padding:12px 14px}
+.editor-fields label{min-width:0;overflow-wrap:anywhere}
+.editor-fields :is(select,input:not([type=checkbox])){width:100%;min-height:42px}
+.editor-fields select[size]{height:124px}
+.editor-fields .hint{line-height:1.2}
+.equipment-hint{display:block;font-size:15px;line-height:1.25;padding:6px 8px;border-left:2px solid #7889bb;background:#14182a;overflow-wrap:anywhere}
+.dex-dialog{width:min(980px,calc(100% - 24px))}
+.dex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px}
+.dex-card{min-width:0;display:flex;flex-direction:column;gap:5px;padding:12px;border:2px solid #505c8c;background:#252a44;box-shadow:inset 0 -4px #14182a;overflow-wrap:anywhere}
+.dex-card strong{font-size:23px}
+.dex-card p{font-size:18px;color:var(--dim)}
+.dex-portrait{width:64px;height:64px;object-fit:contain;align-self:center;background:#14182a;border:1px solid #505c8c}
+.dex-card details{margin-block:4px;color:var(--yellow);font-size:17px}
+.dex-card details p{margin-top:5px;font-size:16px}
+.dex-add{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:auto;padding-top:8px}
+.dex-add button{min-width:0;min-height:40px;padding-inline:3px;font-size:17px}
+@media(max-width:940px){.lab{grid-template-columns:repeat(2,minmax(0,1fr))}.team-head h2{font-size:11px}.match{width:min(100%,760px);justify-self:center}}
+@media(max-width:560px){
+ .lab-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .lab-tools>.dex-launch{grid-column:1/-1;justify-content:center}
+ .tool-menu>summary{font-size:17px;padding:8px;min-height:44px}
+ .tool-menu:last-child .tool-menu-content{left:auto;right:0}
+ .tool-menu-content{min-width:min(220px,85vw)}
+ .setup{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding:10px}
+ .setup>label:first-child{grid-column:1/-1;min-width:0}
+ .setup>.actions{grid-column:1/-1;width:100%;margin:0}
+ .setup>.actions button{min-width:0;font-size:18px;padding-inline:6px}
+ .seed-control input{width:100%;min-width:0}
+ .seed-control button{flex:none}
+ .lab{gap:9px;padding:8px}
+ body:not(.match-view) .lab{grid-template-columns:1fr}
+ body:not(.match-view) .team{grid-row:auto}
+ body:not(.match-view) .team-a{grid-row:3}
+ body:not(.match-view) .team-b{grid-row:4}
+ body:not(.match-view) .active-heading{grid-template-columns:40px minmax(0,1fr) auto}
+ body:not(.match-view) .active-heading img{width:40px}
+ body:not(.match-view) .active-heading b{grid-column:auto}
+ .team-head select{min-height:38px}
+ .slot-main{min-height:48px}
+ .slot-buttons button{min-width:36px;min-height:44px}
+ .form-grid{gap:9px}
+ .editor-fields{padding:10px;gap:10px}
+ .dex-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ .dex-card{padding:8px}
+ .dex-card strong{font-size:19px}
+ .dex-card p{font-size:16px}
+ .dex-add{grid-template-columns:1fr}
+}
+@media(max-width:360px){.dex-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
+@media(max-width:760px),(orientation:landscape) and (max-height:520px){
+ .match-view .lab-tools{display:none}
+ .match-view .match{width:100%}
+ .match-view .team-controls{padding:4px;gap:3px;min-width:0}
+ .match-view .team-controls select{font-size:15px;min-height:30px}
+ .match-view .auto-toggle{font-size:16px;min-height:28px}
+ .match-view .slot-main{min-height:44px}
+ .match-view .slot-main img{width:28px;height:28px}
+ .match-view .slot-content strong{font-size:13px}
+ .match-view .active-heading strong{font-size:8px}
+ .match-view .log-head{gap:4px;margin-inline:6px}
+ .match-view .transport button{min-height:44px}
+}
+@media(orientation:landscape) and (max-height:520px){.match-view .slot-main{min-height:38px}.match-view .slot-main img{width:22px;height:22px}}
