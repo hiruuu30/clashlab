@@ -42,7 +42,7 @@ function portrait(id, alternate, mood='Normal') {
   return typeof src==='string' && src.startsWith('data:image/png;base64,') ? src : './mark.svg';
 }
 function requestPortraits() {
-  const ids=[...new Set(config.teams.flat().filter(Boolean).map(slot=>slot.id))]
+  const ids=[...new Set([...config.teams.flat().filter(Boolean).map(slot=>slot.id),...Array.from(document.querySelectorAll('#dex-results [data-portrait]'),img=>img.dataset.portrait)])]
     .filter(id=>!window.PORTRAITS?.[id] && !portraitRequests.has(id));
   if(!ids.length)return;
   ids.forEach(id=>portraitRequests.add(id));
@@ -524,3 +524,40 @@ $('editor-form').onsubmit=e=>{
   persist();editor.close();clearBattle();
 };
 connect();
+
+const dex=document.createElement('dialog');
+dex.style.width='min(850px,calc(100% - 24px))';
+dex.innerHTML='<header class="dialog-head"><h2>ClashDex</h2><button class="icon-btn" data-close>×</button></header><div class="editor-fields"><input id="dex-query" type="search" placeholder="Search name, ability or TM"><div class="form-grid"><label>Rarity<select id="dex-rarity"></select></label><label>Type<select id="dex-type"></select></label><label>Role<select id="dex-role"></select></label><label>Sort<select id="dex-sort"><option value="name">Name</option><option value="coverage">Type diversity</option><option value="learn">TM versatility</option><option value="mega">Mega options</option><option value="id">Dex number</option></select></label></div><label><span><input type="checkbox" id="dex-mega"> Mega available only</span></label><p id="dex-count" class="hint"></p><div id="dex-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px"></div><button class="secondary" id="dex-more">Show more</button></div>';
+document.body.append(dex);
+const toolsBar=document.createElement('div');toolsBar.className='actions';toolsBar.style.flexWrap='wrap';
+toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button>';
+document.querySelector('.setup').append(toolsBar);
+let dexLimit=36;
+function dexRender(){
+  const q=$('dex-query').value.trim().toLowerCase(), rarity=$('dex-rarity').value,type=$('dex-type').value,role=$('dex-role').value,sort=$('dex-sort').value;
+  const rows=catalog.species.filter(s=>(!rarity||s.rarity===rarity)&&(!type||s.types.map(String).includes(type))&&(!role||s.role===role)&&(!$('dex-mega').checked||s.mega.length)&&[s.name,s.id,s.ability,...s.learn.map(k=>catalog.skills[k])].join(' ').toLowerCase().includes(q));
+  const metric=s=>sort==='learn'?s.learn.length:sort==='mega'?s.mega.length:sort==='coverage'?new Set(s.types).size:0;
+  rows.sort((a,b)=>sort==='id'?Number(a.id)-Number(b.id):metric(b)-metric(a)||a.name.localeCompare(b.name));
+  $('dex-count').textContent=rows.length+' Pokémon · sorting uses catalog attributes, not win-rate predictions';
+  $('dex-results').innerHTML=rows.slice(0,dexLimit).map(s=>'<article class="slot" style="display:block;padding:8px"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id)+'" alt="" width="48" height="48" style="float:left;margin-right:8px"><strong>'+escape(s.name)+'</strong><p>'+escape(s.rarity+' · '+s.role)+'</p><p>'+escape(s.types.map(t=>catalog.types[t]).join(' / '))+'</p><p>'+escape(s.ability)+'</p><details><summary>Moves & forms</summary><p>'+escape('Innate: '+(catalog.skills[s.innate]||s.innate))+'</p><p>'+escape(s.learn.map(k=>catalog.skills[k]||k).join(', '))+'</p><p>'+escape(s.mega.join(', ')||'No Mega')+'</p></details><div><button class="quiet" data-add="0" data-id="'+escape(s.id)+'">+ A</button> <button class="quiet" data-add="1" data-id="'+escape(s.id)+'">+ B</button></div></article>').join('');
+  $('dex-more').hidden=rows.length<=dexLimit;requestPortraits();
+}
+$('dex-open').onclick=()=>{if(!catalog)return;for(const [id,values] of [['dex-rarity',catalog.species.map(s=>[s.rarity,s.rarity])],['dex-role',catalog.species.map(s=>[s.role,s.role])],['dex-type',Object.entries(catalog.types)]]){optionList(id,[['','All'],...new Map(values)],'');}dexLimit=36;dexRender();dex.showModal();};
+dex.querySelector('[data-close]').onclick=()=>dex.close();
+dex.addEventListener('input',e=>{if(e.target.id!=='dex-more'){dexLimit=36;dexRender();}});
+$('dex-more').onclick=()=>{dexLimit+=36;dexRender();};
+dex.addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b||running||starting||bench)return;const side=Number(b.dataset.add);if(config.teams[side].some(m=>m?.id===b.dataset.id)){ $('dex-count').textContent='Already on '+title(side);return;}const index=config.teams[side].findIndex(m=>!m);if(index<0){$('dex-count').textContent=title(side)+' is full. Remove a Pokémon first.';return;}config.teams[side][index]=member(b.dataset.id);persist();clearBattle();$('dex-count').textContent='Added to '+title(side);});
+$('team-inspect').onclick=()=>{if(!catalog)return;const d=document.createElement('dialog');d.innerHTML='<header class="dialog-head"><h2>Team overview</h2><button class="icon-btn">×</button></header><div class="editor-fields">'+config.teams.map((team,i)=>{const roster=team.filter(Boolean).map(m=>species[m.id]);const counts={};for(const p of roster)for(const t of p.types)counts[t]=(counts[t]||0)+1;return '<h2>'+title(i)+'</h2><p>'+escape(Object.entries(counts).map(([t,n])=>catalog.types[t]+': '+n).join(' · ')||'Empty')+'</p><p>'+escape(roster.map(p=>p.name+' — '+p.role).join(' / '))+'</p>';}).join('')+'<p class="hint">Roster type distribution only; not a weakness or matchup score.</p></div>';document.body.append(d);d.querySelector('button').onclick=()=>d.close();d.onclose=()=>d.remove();d.showModal();};
+$('team-export').onclick=()=>{if(!catalog)return;const url=URL.createObjectURL(new Blob([JSON.stringify(config,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='clashlab-team.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('team-import').onclick=()=>{if(!catalog||running||starting||bench)return;const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=async()=>{try{const data=JSON.parse(await input.files[0].text());if(!Array.isArray(data.teams)||data.teams.length!==2||!data.teams.every(t=>Array.isArray(t)&&t.length<=6&&t.filter(Boolean).every(m=>species[m.id])))throw Error('Invalid team file');localStorage.setItem('clashlab-1',JSON.stringify(data));restore();$('rules').value=config.mode;$('seed').value=config.seed;persist();clearBattle();}catch(e){notify('Import failed: '+e.message);}};input.click();};
+function updateEquipmentHints(){
+ if(!edit||!catalog)return;
+ for(const id of ['item','tm-one','tm-two']){
+  const el=$(id);let text;
+  if(id==='item'){const item=items[el.value];const bonus=species[edit.draft.id].levels[el.value]||0;text=item?item.name+' · '+item.rarity+' · Effective level bonus: '+bonus:'No held item equipped.';}
+  else {const k=el.value;text=k?(catalog.skills[k]||k)+' · Compatible with '+species[edit.draft.id].name+' · Rank '+$(id+'-level').value:'No TM equipped.';}
+  el.title=text;let hint=el.parentElement.querySelector('.equipment-hint');if(!hint){hint=document.createElement('small');hint.className='hint equipment-hint';el.after(hint);}hint.textContent=text;
+ }
+}
+editor.addEventListener('change',updateEquipmentHints);
+new MutationObserver(()=>{if(editor.open)updateEquipmentHints();}).observe(editor,{attributes:true,attributeFilter:['open']});
