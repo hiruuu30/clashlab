@@ -130,8 +130,8 @@ function activeCard(i,current) {
   const ability=mon?.isMega?'Mega evolved':species[id]?.ability;
   const name=mon?.name || (live?'Waiting…':leadSpecies?.name || 'No lead');
   const level=mon?'Lv '+mon.lv:lead && !live?'Lv '+levelFor(lead):'';
-  const hp=mon?Math.ceil(mon.hp)+' / '+Math.ceil(mon.max):'—';
-  return '<div class="active-heading"><img data-portrait="'+escape(id)+'" src="'+portrait(id,mon?.portrait)+'" alt=""><div><strong title="'+escape(name)+'">'+escape(name)+'</strong><small>'+escape(typeNames)+'</small></div><b>'+escape(level)+'</b></div><div class="hp" aria-label="'+title(i)+' health">'+healthFill(mon)+'<b>'+hp+'</b></div><div class="buffs">'+(current?.read?'<span>READ</span>':'')+(ability?'<span>'+escape(ability)+'</span>':'')+'</div>';
+  const hp=mon?Math.ceil(mon.hp)+' / '+Math.ceil(mon.max):'Ready';
+  return '<div class="active-heading"><img data-portrait="'+escape(id)+'" src="'+portrait(id,mon?.portrait)+'" alt=""><div><strong title="'+escape(name)+'">'+escape(name)+'</strong><small>'+escape(typeNames)+'</small></div><b>'+escape(level)+'</b></div><div class="hp" aria-label="'+title(i)+' health">'+(mon?healthFill(mon):'<i style="width:0"></i>')+'<b>'+hp+'</b></div><div class="buffs">'+(current?.read?'<span>READ</span>':'')+(ability?'<span>'+escape(ability)+'</span>':'')+'</div>';
 }
 function renderTeam(i) {
   const target=$('team-'+sides[i]);
@@ -152,7 +152,7 @@ function renderTeam(i) {
     return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,aiControlled):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
       +(locked?'':'<div class="slot-buttons"><button data-reorder="'+index+',-1" aria-label="Move '+escape(s.name)+' up"'+disabled(index===0)+'>↑</button><button data-reorder="'+index+',1" aria-label="Move '+escape(s.name)+' down"'+disabled(index===5)+'>↓</button></div>')+'</div>';
   }).join('');
-  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(aiControlled||bench||starting)+'>'+options([['on',isArenaOpponent?'Game AI':'Auto Special'],['off','Manual Special']],aiControlled||config.automatic[i]?'on':'off')+'</select></label><label class="auto-toggle" title="Auto special and cooldown-aware type switching; dodges and Mega are native engine mechanics"><input type="checkbox" data-full-ai'+(config.fullAI[i]||isArenaOpponent?' checked':'')+disabled(locked||isArenaOpponent)+'> Auto battle</label></div>';
+  target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(aiControlled||bench||starting)+'>'+options([['on',aiControlled?'Auto battle active':'Auto Special'],['off','Manual Special']],aiControlled||config.automatic[i]?'on':'off')+'</select></label><label class="auto-toggle" title="Auto special and cooldown-aware type switching; dodges and Mega are native engine mechanics"><input type="checkbox" data-full-ai'+(config.fullAI[i]||isArenaOpponent?' checked':'')+disabled(locked||isArenaOpponent)+'> Auto battle</label></div>';
 }
 
 function updateHp(bar,mon) {
@@ -258,8 +258,15 @@ function show() {
   $('match-caption').textContent=caption;
   const alive=config.teams.every(x=>x.some(Boolean));
   $('start').disabled=!arena||starting||running||bench||!alive;
+  $('start').innerHTML=starting?'Preparing battle…':'<span aria-hidden="true">▶</span> Start battle';
+  if(document.querySelector('.lab-tools'))document.querySelector('.lab-tools').hidden=starting||running||bench||Boolean(live?.over);
+  document.querySelector('.transport').hidden=!running;
+  document.querySelector('.match-tools').hidden=!running&&$('result').hidden;
+  document.querySelector('.log-panel').hidden=!running&&!live?.over;
+  document.querySelector('.setup').inert=starting||running;
   $('benchmark').disabled=starting||running||!alive;
   $('benchmark').textContent=bench?'Cancel benchmark':'Run benchmark';
+  $('benchmark-count').disabled=starting||running||bench;
   $('rules').disabled=starting||running||bench;
   $('seed').disabled=starting||running||bench;
   $('random').disabled=starting||running||bench;
@@ -529,12 +536,14 @@ $('editor-form').onsubmit=e=>{
 connect();
 
 const dex=document.createElement('dialog');
-dex.style.width='min(850px,calc(100% - 24px))';
-dex.innerHTML='<header class="dialog-head"><h2>ClashDex</h2><button class="icon-btn" data-close>×</button></header><div class="editor-fields"><input id="dex-query" type="search" placeholder="Search name, ability or TM"><div class="form-grid"><label>Rarity<select id="dex-rarity"></select></label><label>Type<select id="dex-type"></select></label><label>Role<select id="dex-role"></select></label><label>Sort<select id="dex-sort"><option value="name">Name</option><option value="coverage">Native type coverage</option><option value="bst">Base stat total</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spd">Speed</option><option value="learn">TM versatility</option><option value="mega">Mega options</option><option value="id">Dex number</option></select></label></div><label><span><input type="checkbox" id="dex-mega"> Mega available only</span></label><p id="dex-count" class="hint"></p><div id="dex-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px"></div><button class="secondary" id="dex-more">Show more</button></div>';
+dex.className='dex-dialog';
+dex.innerHTML='<header class="dialog-head"><h2>ClashDex</h2><button class="icon-btn" data-close aria-label="Close Pokédex">×</button></header><div class="editor-fields"><input id="dex-query" aria-label="Search Pokédex" type="search" placeholder="Search name, ability or TM"><div class="form-grid"><label>Rarity<select id="dex-rarity"></select></label><label>Type<select id="dex-type"></select></label><label>Role<select id="dex-role"></select></label><label>Sort<select id="dex-sort"><option value="name">Name</option><option value="coverage">Native type coverage</option><option value="bst">Base stat total</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spd">Speed</option><option value="learn">TM versatility</option><option value="mega">Mega options</option><option value="id">Dex number</option></select></label></div><label><span><input type="checkbox" id="dex-mega"> Mega available only</span></label><p id="dex-count" class="hint"></p><div id="dex-results" class="dex-grid"></div><button class="secondary" id="dex-more">Show more</button></div>';
 document.body.append(dex);
-const toolsBar=document.createElement('div');toolsBar.className='actions';toolsBar.style.flexWrap='wrap';
-toolsBar.innerHTML='<button class="secondary" id="dex-open">Pokédex</button><button class="secondary" id="team-inspect">Team overview</button><button class="secondary" id="team-export">Export teams</button><button class="secondary" id="team-import">Import teams</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button>';
-document.querySelector('.setup').append(toolsBar);
+const toolsBar=document.createElement('nav');toolsBar.className='lab-tools';toolsBar.setAttribute('aria-label','ClashLab tools');
+toolsBar.innerHTML='<button class="secondary dex-launch" id="dex-open">ClashDex <span>Pokédex</span></button><details class="tool-menu"><summary>Analysis tools</summary><div class="tool-menu-content"><button class="secondary" id="team-inspect">Team analyzer</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button></div></details><details class="tool-menu"><summary>Team management</summary><div class="tool-menu-content"><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="team-import">Import JSON</button><button class="secondary" id="team-export">Export JSON</button></div></details>';
+toolsBar.addEventListener('click',e=>{if(e.target.closest('button'))for(const d of toolsBar.querySelectorAll('details'))d.open=false;});
+toolsBar.addEventListener('toggle',e=>{if(e.target.tagName==='DETAILS'&&e.target.open)for(const d of toolsBar.querySelectorAll('details'))if(d!==e.target)d.open=false;},true);
+document.querySelector('.setup').before(toolsBar);
 let dexLimit=36;
 function dexRender(){
   const q=$('dex-query').value.trim().toLowerCase(), rarity=$('dex-rarity').value,type=$('dex-type').value,role=$('dex-role').value,sort=$('dex-sort').value;
@@ -542,7 +551,7 @@ function dexRender(){
   const metric=s=>sort==='learn'?s.learn.length:sort==='mega'?s.mega.length:sort==='coverage'&&supported(s)?coverage(s):['hp','atk','def','spd','bst'].includes(sort)?Number(s[sort])||0:0;
   rows.sort((a,b)=>sort==='id'?Number(a.id)-Number(b.id):metric(b)-metric(a)||a.name.localeCompare(b.name));
   $('dex-count').textContent=rows.length+' Pokémon · sorting uses catalog attributes, not win-rate predictions';
-  $('dex-results').innerHTML=rows.slice(0,dexLimit).map(s=>'<article class="slot" style="display:block;padding:8px"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id)+'" alt="" width="48" height="48" style="float:left;margin-right:8px"><strong>'+escape(s.name)+'</strong><p>'+escape(s.rarity+' · '+s.role)+'</p><p>'+escape(s.types.map(t=>catalog.types[t]).join(' / '))+'</p><p>'+escape(s.ability)+'</p><p>HP '+escape(s.hp)+' · ATK '+escape(s.atk)+' · DEF '+escape(s.def)+' · SPD '+escape(s.spd)+'</p><details><summary>Moves & forms</summary><p>'+escape('Innate: '+(catalog.skills[s.innate]||s.innate))+'</p><p>'+escape(s.learn.map(k=>catalog.skills[k]||k).join(', '))+'</p><p>'+escape(s.mega.join(', ')||'No Mega')+'</p></details><div><button class="quiet" data-add="0" data-id="'+escape(s.id)+'">+ A</button> <button class="quiet" data-add="1" data-id="'+escape(s.id)+'">+ B</button></div></article>').join('');
+  $('dex-results').innerHTML=rows.slice(0,dexLimit).map(s=>'<article class="dex-card"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id)+'" alt="" width="48" height="48" class="dex-portrait"><strong>'+escape(s.name)+'</strong><p>'+escape(s.rarity+' · '+s.role)+'</p><p>'+escape(s.types.map(t=>catalog.types[t]).join(' / '))+'</p><p>'+escape(s.ability)+'</p><p>HP '+escape(s.hp)+' · ATK '+escape(s.atk)+' · DEF '+escape(s.def)+' · SPD '+escape(s.spd)+'</p><details><summary>Moves & forms</summary><p>'+escape('Innate: '+(catalog.skills[s.innate]||s.innate))+'</p><p>'+escape(s.learn.map(k=>catalog.skills[k]||k).join(', '))+'</p><p>'+escape(s.mega.join(', ')||'No Mega')+'</p></details><div class="dex-add"><button class="secondary" data-add="0" data-id="'+escape(s.id)+'">Add to A</button> <button class="secondary" data-add="1" data-id="'+escape(s.id)+'">Add to B</button></div></article>').join('');
   $('dex-more').hidden=rows.length<=dexLimit;requestPortraits();
 }
 $('dex-open').onclick=()=>{if(!catalog)return;for(const [id,values] of [['dex-rarity',catalog.species.map(s=>[s.rarity,s.rarity])],['dex-role',catalog.species.map(s=>[s.role,s.role])],['dex-type',Object.entries(catalog.types)]]){optionList(id,[['','All'],...new Map(values)],'');}dexLimit=36;dexRender();dex.showModal();};
