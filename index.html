@@ -23,8 +23,10 @@
   <div id="workspace" inert>
     <section class="setup" aria-label="Match settings">
       <label>Ruleset <select id="rules"></select></label>
+      <details class="advanced-settings"><summary>Advanced settings</summary><div class="advanced-content">
       <div class="control"><label for="seed">Battle seed</label><div class="seed-control"><input type="number" min="0" max="4294967295" step="1" id="seed" value="498271"><button id="random" class="icon-btn" title="Randomize seed" aria-label="Randomize seed">⟳</button></div></div>
-      <label>Benchmark runs <select id="benchmark-count"><option>10</option><option selected>50</option><option>100</option><option>250</option><option>500</option></select></label><div class="actions"><button id="benchmark" class="secondary">Run benchmark</button><button id="start" class="primary"><span aria-hidden="true">▶</span> Start battle</button></div>
+      <label>Benchmark runs <select id="benchmark-count"><option>10</option><option selected>50</option><option>100</option><option>250</option><option>500</option></select></label><button id="benchmark" class="secondary">Run benchmark</button>
+      </div></details><div class="actions"><button id="start" class="primary"><span aria-hidden="true">▶</span> Start battle</button></div>
     </section>
     <section class="lab" aria-label="Teams and battlefield">
       <header class="match-head" id="match-head" tabindex="-1" aria-label="Battle scoreboard">
