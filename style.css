@@ -529,3 +529,36 @@ dialog{max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;
  .match-view .transport button{min-height:44px}
 }
 @media(orientation:landscape) and (max-height:520px){.match-view .slot-main{min-height:38px}.match-view .slot-main img{width:22px;height:22px}}
+
+
+/* Follow-up fixes from narrow-screen layout review. */
+.advanced-settings{position:relative;flex:none;min-width:0;align-self:end}
+.advanced-settings>summary,.dex-filters>summary{cursor:pointer;color:var(--dim);min-height:44px;padding:10px 12px;border:2px solid #626d9c;background:#161a30;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:18px}
+.advanced-settings>summary::-webkit-details-marker,.dex-filters>summary::-webkit-details-marker{display:none}
+.advanced-settings>summary::after,.dex-filters>summary::after{content:'▾';color:var(--yellow)}
+.advanced-settings[open]>summary::after,.dex-filters[open]>summary::after{content:'▴'}
+.advanced-content{position:absolute;right:0;top:calc(100% + 5px);width:260px;display:grid;gap:10px;padding:12px;background:var(--panel);border:2px solid #6975ab;box-shadow:0 6px 18px #0009;z-index:10}
+.advanced-content .seed-control input{flex:1;min-width:0;width:100%}
+.advanced-content label select{width:100%;min-height:40px}
+.advanced-content>button{min-height:44px}
+.dex-filters .form-grid{padding-top:10px}
+.dex-filters>label{margin-top:10px}
+.dex-card .dex-add button{white-space:nowrap}
+body:not(.match-view) .slot-content small{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.15}
+body:not(.match-view) .match{align-self:start}
+body:not(.match-view) .team{grid-template-rows:auto auto auto 1fr}
+body:not(.match-view) .team-controls{grid-row:3}
+body:not(.match-view) .team-list{grid-row:4}
+@media(max-width:560px){
+ .intro p{font-size:18px}
+ .setup{grid-template-columns:minmax(0,1fr)}
+ .setup>label:first-child,.setup>.actions,.advanced-settings{grid-column:1/-1}
+ .setup>.actions{grid-row:2}
+ .setup>.actions #start{width:100%;min-height:48px;white-space:nowrap}
+ .advanced-settings{grid-row:3}
+ .advanced-content{position:static;width:100%;box-shadow:none;border-top:0}
+ .lab-tools>.secondary,.tool-menu>summary{min-height:44px}
+ .dex-dialog .editor-fields{gap:8px}
+ .dex-card .dex-add button{min-height:44px}
+}
+@media(max-width:360px){.score b{font-size:6px}.markers{gap:2px}.clock{min-width:58px}.tool-menu>summary{font-size:15px}}
