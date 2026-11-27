@@ -646,9 +646,15 @@ $('build-open').onclick=()=>{
 
 $('trainer-import').onclick=()=>{
  if(!catalog||running||starting||bench)return;
- const d=openTool('Import trainer','<label>Trainer username or ID<input data-trainer-query placeholder="@username or numeric trainer ID" maxlength="80"></label><button class="primary" data-trainer-search>Find trainer</button><p class="hint">Search recent public activity and chat, or enter a numeric trainer ID. Not a full leaderboard search. No wallet or login required.</p><p class="hint" data-trainer-status role="status"></p><div data-trainer-results></div><div data-trainer-profile></div><details><summary>Cannot find a ranked trainer?</summary><p>On the official League ranking page, you can copy the trainer ID from the name button using your browser’s Inspect tool (the data-who attribute). Enter it here to import their public current six.</p><p><a href="https://pokeclashleague.xyz/" target="_blank" rel="noopener">Open PokeClash League</a></p></details>');
+ const d=openTool('Import trainer','<label>Trainer username or ID<input data-trainer-query placeholder="@username or numeric trainer ID" maxlength="80"></label><button class="primary" data-trainer-search>Find trainer</button><p class="hint">Search synced ranking names or recent public activity, or enter a numeric trainer ID. Sync the official leaderboard once to find ranked players by name.</p><p class="hint" data-trainer-status role="status"></p><div data-trainer-results></div><div data-trainer-profile></div><details open><summary>Sync official leaderboard</summary><p>On desktop, drag the bookmark below onto your bookmarks bar. Open the official League or Arena ranking, then click the bookmark. It opens ClashLab with the visible names and IDs only. No credentials are transferred.</p><p><a class="secondary" data-board-bookmark>ClashLab · Sync rankings</a> <button class="quiet" data-copy-bookmark>Copy bookmark code</button></p><p><a href="https://pokeclashleague.xyz/" target="_blank" rel="noopener">Open PokeClash League</a></p><p class="hint" data-board-count></p><button class="secondary" data-board-show>Browse synced rankings</button></details>');
  const query=d.querySelector('[data-trainer-query]'),status=d.querySelector('[data-trainer-status]'),results=d.querySelector('[data-trainer-results]'),profile=d.querySelector('[data-trainer-profile]'),search=d.querySelector('[data-trainer-search]');
  let selected=null,serial=0;
+ const bookmark="javascript:(()=>{if(location.origin!=='https://pokeclashleague.xyz'){alert('Open the official PokeClash League or Arena ranking page first.');return;}const rows=[...document.querySelectorAll('.pv-lad .pv-lr')].filter(e=>e.getClientRects().length).map(e=>{const b=e.querySelector('[data-who]');return b?[b.dataset.who,b.textContent.trim().replace(/^@/,''),e.querySelector('.pv-li')?.textContent.trim()||'']:null;}).filter(Boolean);if(!rows.length){alert('No visible ranked trainers. Open the live League or Arena ranking page first.');return;}const url='https://clashlab.vercel.app/#trainer-board='+encodeURIComponent(JSON.stringify(rows.slice(0,200)));window.open(url,'_blank','noopener');})();";
+ d.querySelector('[data-board-bookmark]').href=bookmark;
+ d.querySelector('[data-copy-bookmark]').onclick=async()=>{try{await navigator.clipboard.writeText(bookmark);status.textContent='Bookmark code copied. Create a bookmark with this code as its URL.';}catch{status.textContent='Drag the bookmark link onto your bookmarks bar instead.';}};
+ const local=boardRows();d.querySelector('[data-board-count]').textContent=local.length?local.length+' synced trainers (last imported ranking snapshot).':'No ranking synced yet.';
+ const renderMatches=rows=>{results.innerHTML=rows.map(m=>'<button class="secondary" data-trainer-id="'+escape(m.id)+'">'+(m.rank?'#'+escape(m.rank)+' · ':'')+'@'+escape(m.name)+'</button>').join(' ');};
+ d.querySelector('[data-board-show]').onclick=()=>{selected=null;profile.replaceChildren();renderMatches(local);status.textContent=local.length?'Select a ranked trainer.':'Sync a ranking first.';};
  async function request(params){
   const response=await fetch('/api/trainer?'+new URLSearchParams(params),{cache:'no-store',signal:AbortSignal.timeout(12000)});
   const body=await response.json().catch(()=>null);if(!response.ok||!body)throw Error(body?.error||'Trainer service unavailable');return body;
@@ -669,13 +675,17 @@ $('trainer-import').onclick=()=>{
  async function find(){
   const v=query.value.trim().replace(/^@+/,'');if(/^\d+$/.test(v))return load(v);
   if(v.length<2){status.textContent='Enter at least two username characters.';return;}
+  const rank=v.match(/^(?:top\s*|rank\s*|#)(\d+)$/i);const matches=local.filter(m=>rank?Number(m.rank)===Number(rank[1]):m.name.toLowerCase().includes(v.toLowerCase()));
+  const exactLocal=matches.filter(m=>rank||m.name.toLowerCase()===v.toLowerCase());
+  if(exactLocal.length===1){results.replaceChildren();return load(exactLocal[0].id);}
+  if(matches.length){selected=null;profile.replaceChildren();renderMatches(matches);status.textContent='Select a trainer from your synced ranking.';return;}
   const n=++serial;selected=null;profile.replaceChildren();results.replaceChildren();status.textContent='Searching public activity…';search.disabled=true;
   try{
    const p=await request({q:v});if(n!==serial||!d.open)return;
    const rows=Array.isArray(p.matches)?p.matches:[];
    const exact=rows.filter(m=>m.name.toLowerCase()===v.toLowerCase());
    if(exact.length===1)return load(exact[0].id);
-   status.textContent=rows.length?'Select a matching trainer.':'Not found in recent public activity. Try their trainer ID from the official ranking page.';
+   status.textContent=rows.length?'Select a matching trainer.':'Not found in recent public activity. Sync the official ranking below to search that trainer by name.';
    results.innerHTML=rows.map(m=>'<button class="secondary" data-trainer-id="'+escape(m.id)+'">@'+escape(m.name)+'</button>').join(' ');
   }catch(e){if(n===serial)status.textContent=e.message;}finally{if(n===serial)search.disabled=false;}
  }
@@ -689,3 +699,15 @@ $('trainer-import').onclick=()=>{
  });
  query.focus();
 };
+
+const boardKey='clashlab-trainer-board-v1';
+function boardRows(){try{const a=JSON.parse(localStorage.getItem(boardKey)||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
+function parseBoardLink(){
+ if(!location.hash.startsWith('#trainer-board='))return;
+ try{const raw=JSON.parse(decodeURIComponent(location.hash.slice('#trainer-board='.length)));if(!Array.isArray(raw))throw Error('Invalid ranking');
+ const rows=raw.slice(0,200).filter(v=>Array.isArray(v)&&/^\d{1,15}$/.test(String(v[0]))&&typeof v[1]==='string'&&v[1].trim()).map(v=>({id:String(v[0]),name:v[1].trim().slice(0,80),rank:String(v[2]||'').slice(0,12)}));
+ if(!rows.length)throw Error('No valid ranked trainers');localStorage.setItem(boardKey,JSON.stringify(rows));history.replaceState(null,'',location.pathname+location.search);return rows.length;
+ }catch(e){history.replaceState(null,'',location.pathname+location.search);return 0;}
+}
+const importedBoardCount=parseBoardLink();
+if(importedBoardCount){const timer=setInterval(()=>{if(catalog){clearInterval(timer);$('trainer-import').click();}},250);setTimeout(()=>clearInterval(timer),20000);}
