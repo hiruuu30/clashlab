@@ -19,13 +19,15 @@ function bootstrap() {
   // The engine reads timings separately from images. Workers only need the frame data.
   self.SPR = (id, animations) => { self.SPRITE_T[id] = animations; };
   const species = Object.values(GD.SPECIES).map(s => ({
-    id:s.id, name:s.name, types:s.types, rarity:GD.RAR[s.rar].n, role:GD.ROLES[s.role].n, ability:s.abN,
+    id:s.id, name:s.name, types:s.types, rarity:GD.RAR[s.rar].n, role:GD.ROLES[s.role].n, ability:s.abN, hp:s.hp, atk:s.atk, def:s.def, spd:s.spd, bst:s.bst, abilityEffects:[1,2,3].map(l=>GD.ABIL[s.ab]?.d(l)||''),
     innate:GD.innateOf(s.id), learn:GD.learnOf(s.id),
     mega:[GD.MEGA_SP[s.id]?.name, GD.MEGA_SP2[s.id]?.name].filter(Boolean),
-    levels:core.CFG.items.map((item,k)=>core.itemLv({k,r:item.r},s.id))
+    levels:core.CFG.items.map((item,k)=>core.itemLv({k,r:item.r},s.id)),
+    activeEffects:core.CFG.items.map((item,k)=>Boolean(core.heldFx({k,r:item.r},s.id)))
   }));
   send('ready',{species,skills,modes,types:Object.fromEntries(Object.entries(GD.TYPES).map(([k,v])=>[k,v.n])),
-    items:core.CFG.items.map((item,k)=>({k,name:item.n,rarity:core.RAR_N[item.r]}))});
+    typeMatrix:Object.fromEntries(Object.keys(GD.TYPES).map(a=>[a,Object.fromEntries(Object.keys(GD.TYPES).map(b=>[b,GD.eff(a,[b])]))])),
+    items:core.CFG.items.map((item,k)=>({k,name:item.n,rarity:core.RAR_N[item.r],tags:core.heldTags({k,r:item.r}),hasBattleEffect:!!core.heldDef({k,r:item.r})}))});
 }
 
 function benchmark(config, job) {
