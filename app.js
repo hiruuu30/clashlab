@@ -490,21 +490,23 @@ function openEditor(side,index) {
   const slot=config.teams[side][index];
   edit={side,index,draft:structuredClone(slot||member(catalog.species[0].id))};
   $('slot-label').textContent=title(side)+' · Slot '+(index+1);
-  $('species-search').value='';
+  $('species-search').value='';$('species-search').hidden=true;$('species-find').setAttribute('aria-expanded','false');$('species-find').textContent='Search';$('editor-equipment').open=false;
   $('remove').hidden=!slot;
   speciesList();
   optionList('item',[['','No held item'],...catalog.items.map(x=>[x.k,x.name+' · '+x.rarity])],edit.draft.item);
-  editFields();editor.showModal();$('species-search').focus();
+  editFields();editor.showModal();editor.querySelector('.dialog-head button').focus({preventScroll:true});
 }
 function speciesList() {
   const q=$('species-search').value.trim().toLowerCase();
   const list=catalog.species.filter(s=>s.name.toLowerCase().includes(q));
-  optionList('species',list.map(x=>[x.id,x.name+' · '+x.rarity]),edit.draft.id);
+  const choices=list.map(x=>[x.id,x.name+' · '+x.rarity]);
+  if(!list.some(x=>x.id===edit.draft.id)){const current=species[edit.draft.id];choices.unshift([current.id,current.name+' · '+current.rarity+' (current)']);}
+  optionList('species',choices,edit.draft.id);
 }
 function editFields() {
   const x=edit.draft;const s=species[x.id];
   $('level').value=x.lv;$('ability').value=x.ability;$('item').value=x.item;
-  $('species-info').textContent=s.types.map(t=>catalog.types[t]).join(' / ')+' · '+s.role+' · '+s.ability+' · Innate '+catalog.skills[s.innate];
+  $('species-info').textContent=s.types.map(t=>catalog.types[t]).join(' / ')+' · '+s.role+' · '+(s.ranged?'Ranged':'Melee')+' · '+s.ability+' · Innate '+catalog.skills[s.innate];
   optionList('mega',[[0,'No Mega'],...s.mega.map((label,j)=>[j+1,label])],x.mega);
   for(const [i,key] of ['one','two'].entries()){
     const choices=localSlots(x).filter(t=>!t || t!==x.tms[1-i].k).map(k=>[k,k?catalog.skills[k]:'No TM']);
@@ -516,9 +518,11 @@ function editFields() {
   $('effective').textContent='Effective battle level '+levelFor(x)+note;
 }
 $('species-search').oninput=speciesList;
+$('species-find').onclick=()=>{const input=$('species-search'),show=input.hidden;input.hidden=!show;$('species-find').setAttribute('aria-expanded',String(show));$('species-find').textContent=show?'Done':'Search';if(show){input.focus();}else{input.value='';speciesList();$('species-find').focus();}};
+$('species-search').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('species').focus();}};
 $('species').onchange=()=>{
   if(!species[$('species').value])return;
-  Object.assign(edit.draft,{id:$('species').value,mega:0,tms:[{k:'',lv:1},{k:'',lv:1}]});editFields();
+  Object.assign(edit.draft,{id:$('species').value,mega:0,tms:[{k:'',lv:1},{k:'',lv:1}]});$('species-search').value='';$('species-search').hidden=true;$('species-find').setAttribute('aria-expanded','false');$('species-find').textContent='Search';speciesList();editFields();
 };
 function readLevel() {
   if($('level').value==='')return;
@@ -578,12 +582,14 @@ function tmEffect(k,l){
 }
 function updateEquipmentHints(){
  if(!edit||!catalog)return;
+ const effects=[];
  for(const id of ['item','tm-one','tm-two']){
   const el=$(id);let text;
   if(id==='item'){const item=items[el.value];const bonus=species[edit.draft.id].levels[el.value]||0;text=item?item.name+' · '+item.rarity+' · Effective level bonus: '+bonus+' · '+(item.tags?.join(' / ')||'No listed battle effects')+(item.hasBattleEffect&&!species[edit.draft.id].activeEffects?.[Number(el.value)]?' · Conditional combat effect not active for this Pokémon':''):'No held item equipped.';}
   else {const k=el.value;text=k?(catalog.skills[k]||k)+' · '+tmEffect(k,Number($(id+'-level').value))+' · Compatible with '+species[edit.draft.id].name:'No TM equipped.';}
-  el.title=text;for(const option of el.options){if(id==='item'){const it=items[option.value];option.title=it?.tags?.join(' / ')||'';}else{option.title=option.value?tmEffect(option.value,Number($(id+'-level').value)):'';}}let hint=el.parentElement.querySelector('.equipment-hint');if(!hint){hint=document.createElement('small');hint.className='hint equipment-hint';el.after(hint);}hint.textContent=text;
+  el.title=text;for(const option of el.options){if(id==='item'){const it=items[option.value];option.title=it?.tags?.join(' / ')||'';}else{option.title=option.value?tmEffect(option.value,Number($(id+'-level').value)):'';}}if(el.value)effects.push('<p class="hint equipment-hint">'+escape(text)+'</p>');
  }
+ $('editor-effect-list').innerHTML=effects.join('');$('editor-equipment').hidden=!effects.length;if(!effects.length)$('editor-equipment').open=false;
 }
 editor.addEventListener('change',updateEquipmentHints);
 new MutationObserver(()=>{if(editor.open)updateEquipmentHints();}).observe(editor,{attributes:true,attributeFilter:['open']});
