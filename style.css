@@ -1198,3 +1198,49 @@ body:not(.match-view) .team-list{grid-row:4}
 @media(max-width:350px){.cx-browser-toolbar{padding-inline:5px}.cx-results-scroll{padding-inline:5px}.analysis-mon{gap:4px}.analysis-compare-head .analysis-mon{align-items:flex-start}.analysis-compare-head .analysis-mon img{width:24px;height:24px}.analysis-row{grid-template-columns:20px minmax(0,1fr) auto}}
 /* In short landscape windows retain usable result space. */
 @media(max-height:420px){.cx-browser-toolbar{max-height:62dvh;overflow:auto}.analysis-controls{max-height:40dvh}}
+
+/* Build rankings: fixed configuration, independent result scrolling, compact phones. */
+.cx-rank-launch{color:var(--yellow);white-space:nowrap}
+.clashdex-v2 .cx-rank-dialog{width:min(720px,calc(100% - 20px));height:min(800px,calc(100dvh - 20px));max-height:calc(100dvh - 20px);padding:0;overflow:hidden;background:#171c32;border:2px solid #6975ab;color:var(--text)}
+.cx-rank-dialog[open]{display:flex;flex-direction:column}
+.cx-rank-controls{flex:none;max-height:62dvh;overflow:auto;padding:7px 10px;border-bottom:1px solid #46527e;background:#1c2038;display:grid;gap:5px}
+.cx-rank-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.cx-rank-primary label{display:grid;gap:3px;font-size:16px;color:var(--dim)}
+.cx-rank-controls :is(select,input:not([type=checkbox])){width:100%;min-height:34px;font-size:16px}
+.cx-rank-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+.cx-rank-quick button{min-height:32px;border:1px solid #46527e;background:#252c46;font-size:16px;padding:3px}
+.cx-rank-quick button[aria-pressed=true]{border-color:var(--yellow);color:var(--yellow)}
+.cx-rank-details{font-size:16px;color:var(--dim);border:1px solid #46527e;padding:5px}
+.cx-rank-details summary,.cx-rank-method summary{cursor:pointer}
+.cx-rank-details .cx-filter-grid{gap:5px;margin:5px 0}
+.cx-rank-details .cx-filter-grid label{font-size:15px}
+.cx-rank-checks{display:flex;flex-wrap:wrap;gap:5px 10px}
+.cx-rank-checks label{display:flex;align-items:center;gap:4px}
+.cx-rank-checks input{height:16px;width:16px}
+.cx-rank-controls>[data-rank-run]{min-height:34px;padding:3px 7px;font-size:17px}
+.cx-rank-controls>[data-rank-status]{font-size:14px}
+.cx-rank-scroll{flex:1;overflow:auto;overscroll-behavior:contain;padding:6px 10px 12px;min-height:0}
+[data-rank-results]{display:grid;gap:4px}
+.cx-rank-row{display:grid;grid-template-columns:25px 34px minmax(0,1fr) minmax(50px,auto);align-items:center;gap:5px;background:#252c46;border:1px solid #46527e;color:inherit;text-align:left;padding:5px;min-height:55px;width:100%}
+.cx-rank-row img{width:34px;height:34px;object-fit:contain}
+.cx-rank-name,.cx-rank-value{display:grid;gap:2px;min-width:0}
+.cx-rank-name strong{font-size:19px;overflow-wrap:anywhere;line-height:1}
+.cx-rank-name small{font-size:13px;color:var(--dim);line-height:1.1;overflow-wrap:anywhere}
+.cx-rank-value{font:23px/1 var(--number);color:var(--yellow);text-align:right}
+.cx-rank-value small{font:13px/1 VT323,monospace;color:var(--dim);max-width:78px;overflow-wrap:anywhere}
+.cx-rank-method{font-size:15px;color:var(--dim);padding:8px 0;line-height:1.25}
+.cx-rank-method p{margin-top:5px}
+[data-rank-more]{width:100%;min-height:34px;margin-top:5px}
+@media(max-width:760px){
+ .clashdex-v2 .cx-rank-dialog{width:100%;height:100dvh;max-height:100dvh;max-width:100%;margin:0;border:0}
+ .cx-rank-controls{padding:5px 8px;max-height:61dvh}
+ .cx-rank-dialog .cx-filter-head{padding:5px 8px}
+ .cx-rank-scroll{padding:5px 8px max(10px,env(safe-area-inset-bottom))}
+ .cx-rank-name strong{font-size:17px}
+ .cx-rank-row{grid-template-columns:20px 30px minmax(0,1fr) auto;gap:4px;padding:4px}
+ .cx-rank-row img{width:30px;height:30px}
+ .cx-rank-value{font-size:21px}
+ .cx-browser-toolbar .cx-results-head{flex-wrap:wrap}
+ .cx-result-actions{margin-left:auto}
+ .cx-result-actions .cx-rank-launch{font-size:14px;padding-inline:4px}
+}
