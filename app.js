@@ -306,7 +306,10 @@ function ensureTeams() {
   clearNotice();return true;
 }
 
+const dexPending=new Map();let dexJob=0;
+function requestDex(type,payload){return new Promise((resolve,reject)=>{if(!workers||!catalog){reject(Error('Engine unavailable'));return;}const job=++dexJob;const timer=setTimeout(()=>{dexPending.delete(job);reject(Error('Engine request timed out'));},15000);dexPending.set(job,{resolve,reject,timer});workers.postMessage({type,job,...payload});});}
 function handle(message) {
+  if(message.type==='dex-preview'||message.type==='dex-timing'){const p=dexPending.get(message.job);if(p){clearTimeout(p.timer);dexPending.delete(message.job);if(message.error)p.reject(Error(message.error));else p.resolve(message.result);}return;}
   if(message.type==='ready'){
     catalog=message;refTypes=Object.keys(message.typeMatrix||{});species=Object.fromEntries(message.species.map(x=>[x.id,x]));items=Object.fromEntries(message.items.map(x=>[x.k,x]));
     for(let i=0;i<2;i++)for(let j=0;j<presets[i].length;j++)if(!species[presets[i][j]])presets[i][j]=message.species[(i*6+j)%message.species.length].id;
@@ -543,13 +546,14 @@ toolsBar.addEventListener('click',e=>{if(e.target.closest('button'))for(const d 
 toolsBar.addEventListener('toggle',e=>{if(e.target.tagName==='DETAILS'&&e.target.open)for(const d of toolsBar.querySelectorAll('details'))if(d!==e.target)d.open=false;},true);
 document.querySelector('.setup').before(toolsBar);
 const clashDex=mountDex({
- getCatalog:()=>catalog,getTeams:()=>config.teams,portrait,requestPortraits,tmEffect,
+ getCatalog:()=>catalog,getTeams:()=>config.teams,getMode:()=>config.mode,portrait,requestPortraits,tmEffect,requestDex,
  canEdit:()=>Boolean(catalog&&!running&&!starting&&!bench),
- add(id,form,side,slot){
+ add(id,form,side,slot,build={}){
   if(!catalog||running||starting||bench)return 'Team editing is unavailable during a battle.';
   const team=config.teams[side];if(!team||!Number.isInteger(slot)||slot<0||slot>=6||!species[id])return 'Invalid team selection.';
   if(team.some((m,j)=>m?.id===id&&j!==slot))return 'This species is already on '+title(side)+'.';
-  team[slot]={...member(id),mega:integer(form,0,species[id].mega.length)};
+  const draft={...member(id),lv:integer(build.lv??50,1,50),ability:integer(build.ability??1,1,3),item:build.item!==''&&items[String(build.item)]?String(build.item):'',mega:integer(form,0,species[id].mega.length)};
+  const seen=new Set([species[id].innate]);draft.tms=draft.tms.map((v,i)=>{const t=build.tms?.[i];if((i===1&&draft.lv<12)||!t||!species[id].learn.includes(t.k)||seen.has(t.k))return v;seen.add(t.k);return {k:t.k,lv:integer(t.lv,1,3)};});team[slot]=draft;
   persist();clearBattle();return species[id].name+' added to '+title(side)+'.';
  }
 });
