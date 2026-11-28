@@ -18,14 +18,25 @@ function bootstrap() {
   self.SPRITE_T = {};
   // The engine reads timings separately from images. Workers only need the frame data.
   self.SPR = (id, animations) => { self.SPRITE_T[id] = animations; };
+  // Expose the game catalog as data, not a separate hardcoded Pokédex.
+  const statData = (p,b) => ({hp:p.hp,atk:p.atk,def:p.def,spd:p.spd,bst:p.bst,
+    base:b?{hp:b.hp,atk:b.atk,def:b.def,spa:b.spa,spd:b.spd,spe:b.spe}:null});
+  const megaData=(p,f)=>p?{id:p.id,form:f,name:p.name,types:p.types,stone:p.stone,
+    portrait:typeof p.por==='string'&&p.por.startsWith('data:image/png;base64,')?p.por:null,...statData(p,p.b)}:null;
   const species = Object.values(GD.SPECIES).map(s => ({
-    id:s.id, name:s.name, types:s.types, rarity:GD.RAR[s.rar].n, role:GD.ROLES[s.role].n, ability:s.abN, hp:s.hp, atk:s.atk, def:s.def, spd:s.spd, bst:s.bst, abilityEffects:[1,2,3].map(l=>GD.ABIL[s.ab]?.d(l)||''),
+    id:s.id,name:s.name,types:s.types,rarity:GD.RAR[s.rar].n,rarityColor:GD.RAR[s.rar].c,
+    role:GD.ROLES[s.role].n,roleDescription:GD.ROLES[s.role].d,ranged:!!GD.ROLES[s.role].ranged,ability:s.abN,
+    ...statData(s,s.base),abilityEffects:[1,2,3].map(l=>GD.ABIL[s.ab]?.d(l)||''),
     innate:GD.innateOf(s.id), learn:GD.learnOf(s.id),
     mega:[GD.MEGA_SP[s.id]?.name, GD.MEGA_SP2[s.id]?.name].filter(Boolean),
+    megaForms:[megaData(GD.MEGA_SP[s.id],1),megaData(GD.MEGA_SP2[s.id],2)].filter(Boolean),
+    previous:GD.PRE[s.id]||null,evolutions:(GD.EVO[s.id]||[]).map(e=>({to:e.to,lv:e.lv||null,how:e.how||null})),
+    moves:s.types.map(t=>{const m=GD.moveOf(s.id,t);return {type:t,basic:m[0],special:m[1]};}),
     levels:core.CFG.items.map((item,k)=>core.itemLv({k,r:item.r},s.id)),
     activeEffects:core.CFG.items.map((item,k)=>Boolean(core.heldFx({k,r:item.r},s.id)))
   }));
   send('ready',{species,skills,modes,types:Object.fromEntries(Object.entries(GD.TYPES).map(([k,v])=>[k,v.n])),
+    typeColors:Object.fromEntries(Object.entries(GD.TYPES).map(([k,v])=>[k,v.c])),
     typeMatrix:Object.fromEntries(Object.keys(GD.TYPES).map(a=>[a,Object.fromEntries(Object.keys(GD.TYPES).map(b=>[b,GD.eff(a,[b])]))])),
     items:core.CFG.items.map((item,k)=>({k,name:item.n,rarity:core.RAR_N[item.r],tags:core.heldTags({k,r:item.r}),hasBattleEffect:!!core.heldDef({k,r:item.r})}))});
 }
