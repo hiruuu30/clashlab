@@ -79,40 +79,68 @@ function dexPreview(q) {
    animation:timingFor(q.id,u.ranged)};
 }
 
-/* Rank configured legal builds without running battles or fetching sprites. */
-function dexRank(q) {
- const candidates=[],skipped={incompatible:0,locked:0,inactive:0},lv=Math.max(1,Math.min(50,Math.trunc(Number(q.lv)||1)));
- const selected=(q.tms||[]).filter(t=>t&&t.k);
- if((selected.length>1||q.tm2)&&lv<12)throw Error('Second TM requires base level 12.');
- if(new Set(selected.map(t=>t.k)).size!==selected.length)throw Error('Select two different TMs.');
- const all=Object.values(GD.SPECIES), item=q.item===''?-1:Number(q.item);
- for(const sp of all){
-  if(q.rarity&&GD.RAR[sp.rar].n!==q.rarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.innate&&GD.innateOf(sp.id)!==q.innate||q.abilityName&&sp.abN!==q.abilityName)continue;
-  if(selected.some(t=>t.k===GD.innateOf(sp.id)||!GD.learnOf(sp.id).includes(t.k))){skipped.incompatible++;continue;}
-  const def=runtime.core.CFG.items[item],it=def?{k:item,r:def.r}:null;
-  if(q.activeOnly&&it&&!runtime.core.heldFx(it,sp.id)){skipped.inactive++;continue;}
-  const forms=[0,...(GD.MEGA_SP[sp.id]?[1]:[]),...(GD.MEGA_SP2[sp.id]?[2]:[])].filter(f=>q.forms==='mega'?f>0:q.forms==='all'?true:f===0);
-  for(const form of forms){
-   const v=dexPreview({...q,id:sp.id,form,lv,tms:selected});
-   const chance=Math.min(1,Math.max(0,(v.held?.qc||0)/100));
-   const expectedCooldown=((1-chance)*v.cooldown+chance*.3)/v.speedMul;
-   const incoming=q.incoming&&Object.hasOwn(GD.TYPES,q.incoming)?GD.eff(q.incoming,v.types):1;
-   const taken=v.damageTaken*(q.attackerRange==='ranged'?v.rangedDamageTaken:1);
-   const dodge=q.incomingKind==='special'?v.specialDodge:v.dodge;
-   const bulk=v.currentHP*(120+v.defense)/120/Math.max(.0001,taken*incoming);
-   const evadeBulk=bulk/Math.max(.0001,1-dodge);
-   const forced=Object.entries(self.FORMS?.[sp.id]||{}).find(([key])=>key===def?.k);
-   const key=form?sp.id+':'+form:forced&&v.heldActive?sp.id+':held:'+item:sp.id+':0';
-   candidates.push({key,id:sp.id,form,name:v.form,types:v.types,ranged:v.ranged,ability:sp.abN,innate:GD.innateOf(sp.id),rarity:GD.RAR[sp.rar].n,
-    effective:v.effective,bonus:v.bonus,hp:v.hp,currentHP:v.currentHP,atk:v.attack,def:v.defense,spd:v.spd,moveSpeed:60+v.spd*.9,
-    cooldown:v.cooldownAdjusted,expectedCooldown,bulk,evadeBulk,crit:v.crit*100,dodge:dodge*100,firstHit:v.firstHitAttack,
-    active:v.heldActive,protect:v.skills.find(t=>t.k==='pr')?.lv||0,recover:v.skills.find(t=>t.k==='rc')?.lv||0,
-    balloon:!!(v.held?.ball&&q.incoming==='terra')});
-  }
- }
- return {rows:candidates,skipped};
+/* Build optimizer: exhaustive distinct item effects for the objective; monotone TM bonuses. */
+const rankPriorities={
+ expectedCooldown:['ag','sd','id','dt'],spd:['ag','sd','id','dt'],
+ evadeBulk:['id','dt','sd','ag'],bulk:['id','dt','sd','ag'],
+ hp:['id','dt','sd','ag'],atk:['sd','ag','fe','id'],firstHit:['sd','ag','fe','id'],
+ def:['id','dt','sd','ag'],crit:['fe','sd','ag','id'],dodge:['dt','id','sd','ag']
+};
+function rankTms(sp,q,lv){
+ const innate=GD.innateOf(sp.id),learn=new Set(GD.learnOf(sp.id)),slots=lv>=12?2:1;
+ const raw=[q.tm1??'auto',q.tm2??'auto'],ranks=[Number(q.tm1rank)||3,Number(q.tm2rank)||3],used=new Set([innate]);
+ const out=[null,null];
+ if(slots===1&&raw[1]&&raw[1]!=='auto')return null;
+ for(let i=0;i<slots;i++){const k=raw[i];if(!k||k==='auto')continue;if(used.has(k)||!learn.has(k))return null;used.add(k);out[i]={k,lv:Math.max(1,Math.min(3,ranks[i]))};}
+ // Auto ranks are fixed to the requested rank; assign the strongest available rank to the primary skill.
+ const free=Array.from({length:slots},(_,i)=>i).filter(i=>raw[i]==='auto').sort((a,b)=>ranks[b]-ranks[a]||a-b);
+ for(const i of free){const k=(rankPriorities[q.metric]||rankPriorities.evadeBulk).find(k=>learn.has(k)&&!used.has(k));if(k){out[i]={k,lv:Math.max(1,Math.min(3,ranks[i]))};used.add(k);}}
+ // Preserve empty first slots in the editable build, but exclude them from native skill inputs.
+ return out.map(t=>t||{k:'',lv:1});
 }
-
+function rankOne(q,sp,form,item,tms){
+ const {core}=runtime,def=core.CFG.items[Number(item)],v=dexPreview({...q,id:sp.id,form,item,tms:tms.filter(t=>t.k)});
+ const chance=Math.min(1,Math.max(0,(v.held?.qc||0)/100));
+ const expectedCooldown=((1-chance)*v.cooldown+chance*.3)/v.speedMul;
+ const incoming=q.incoming&&Object.hasOwn(GD.TYPES,q.incoming)?GD.eff(q.incoming,v.types):1;
+ const taken=v.damageTaken*(q.attackerRange==='ranged'?v.rangedDamageTaken:1),dodge=q.incomingKind==='special'?v.specialDodge:v.dodge;
+ const bulk=v.currentHP*(120+v.defense)/120/Math.max(.0001,taken*incoming),evadeBulk=bulk/Math.max(.0001,1-dodge);
+ const forced=item!==''&&Object.entries(self.FORMS?.[sp.id]||{}).some(([key])=>key===def?.k);
+ const key=form?sp.id+':'+form:forced&&v.heldActive?sp.id+':held:'+item:sp.id+':0';
+ return {key,id:sp.id,form,name:v.form,types:v.types,ranged:v.ranged,ability:sp.abN,innate:GD.innateOf(sp.id),rarity:GD.RAR[sp.rar].n,effective:v.effective,bonus:v.bonus,hp:v.hp,currentHP:v.currentHP,atk:v.attack,def:v.defense,spd:v.spd,cooldown:v.cooldownAdjusted,expectedCooldown,bulk,evadeBulk,crit:v.crit*100,dodge:dodge*100,firstHit:v.firstHitAttack,active:v.heldActive,protect:v.skills.find(t=>t.k==='pr')?.lv||0,recover:v.skills.find(t=>t.k==='rc')?.lv||0,balloon:!!(v.held?.ball&&q.incoming==='terra'),build:{item,tms,form}};
+}
+function rankItemChoices(q,sp){
+ const {core}=runtime,indices=q.item==='auto'?['',...core.CFG.items.map((_,i)=>String(i))]:[q.item??''];
+ // Only merge items with identical score-relevant effect and effective level. Keep a concrete representative.
+ const seen=new Set(),out=[];
+ for(const item of indices){
+  const d=item===''?null:core.CFG.items[Number(item)],it=d?{k:Number(item),r:d.r}:null,h=core.heldFx(it,sp.id);
+  if(q.activeOnly&&it&&!h)continue;
+  const mode=runtime.modes.find(m=>m.id===q.mode)||runtime.modes[0],bonus=core.itemLv(it,sp.id),effective=!mode.cap?q.lv+bonus:mode.kind==='arena'?Math.min(q.lv,mode.cap)+bonus:Math.min(q.lv+bonus,mode.cap);
+  const signature=JSON.stringify([effective,!!h,h?.st||null,h?.ty||null,h?.mty||null,h?.spd||1,h?.qc||0,h?.dmg||1,h?.wp||1,h?.taken||1,h?.vsR||1,h?.crit||0,h?.eva||0]);
+  if(seen.has(signature))continue;seen.add(signature);out.push(item);
+ }
+ return out;
+}
+function dexRank(q) {
+ const candidates=[],skipped={incompatible:0,inactive:0},lv=Math.max(1,Math.min(50,Math.trunc(Number(q.lv)||1))),metric=Object.hasOwn(rankPriorities,q.metric)?q.metric:'expectedCooldown';
+ q={...q,lv,metric};
+ if(lv<12&&q.tm2&&q.tm2!=='auto')throw Error('Second TM requires base level 12.');
+ if(q.tm1&&q.tm1!=='auto'&&q.tm1===q.tm2)throw Error('Select two different TMs.');
+ const dir=metric==='expectedCooldown'?1:-1;
+ let evaluated=0;
+ const better=(a,b)=>!b||dir*(a[metric]-b[metric])< -1e-9||Math.abs(a[metric]-b[metric])<=1e-9&&(a.atk>b.atk+1e-9||Math.abs(a.atk-b.atk)<=1e-9&&a.evadeBulk>b.evadeBulk+1e-9);
+ for(const sp of Object.values(GD.SPECIES)){
+  if(q.rarity&&GD.RAR[sp.rar].n!==q.rarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.innate&&GD.innateOf(sp.id)!==q.innate||q.abilityName&&sp.abN!==q.abilityName)continue;
+  const tms=rankTms(sp,q,lv);if(!tms){skipped.incompatible++;continue;}
+  const items=rankItemChoices(q,sp);if(!items.length){skipped.inactive++;continue;}
+  const forms=[0,...(GD.MEGA_SP[sp.id]?[1]:[]),...(GD.MEGA_SP2[sp.id]?[2]:[])].filter(f=>q.forms==='mega'?f>0:q.forms==='all'?true:f===0);
+  let best=null;
+  for(const form of forms)for(const item of items){const row=rankOne(q,sp,form,item,tms);evaluated++;if(better(row,best))best=row;}
+  if(best)candidates.push(best);
+ }
+ return {rows:candidates,skipped,evaluated,metric};
+}
 function timingFor(id,ranged,load=false){
  const anim=ranged?'Shoot':'Attack';
  if(load&&!loadedTimings.has(id)){try{importScripts(upstream+'sp/'+encodeURIComponent(id)+'.js');if(self.SPRITE_T[id])loadedTimings.add(id);}catch{}}
