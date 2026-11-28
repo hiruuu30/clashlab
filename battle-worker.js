@@ -142,6 +142,92 @@ function dexRank(q) {
  }
  return {rows:candidates,skipped,evaluated,metric};
 }
+/* Budgeted roster planning. All acquisition costs are planning estimates, not live offers. */
+function teamPlan(q){
+ const {core,modes}=runtime,C=core.CFG;
+ const bounded=(v,lo,hi,def)=>Number.isFinite(Number(v))?Math.min(hi,Math.max(lo,Number(v))):def;
+ const budget=Math.floor(bounded(q.budget,0,1e12,500000)),lv=Math.floor(bounded(q.lv,1,50,50)),size=Math.floor(bounded(q.size,1,6,6));
+ const rank=Math.floor(bounded(q.rank,1,3,2)),mult=bounded(q.priceFactor,0.1,50,1),tmReserve=bounded(q.tmReserve,0,1e9,C.shop.tm),solBudget=bounded(q.solBudget,0,1e6,0);
+ const maxRarity=bounded(q.maxRarity,0,4,4),minRarity=bounded(q.minRarity,0,4,0),maxMega=q.mega==='off'?0:1;
+ const mode=modes.find(m=>m.id===q.mode)||modes[0],all=Object.values(GD.SPECIES),types=Object.keys(GD.TYPES);
+ const price=(id)=>Math.max(100,Math.round(core.mkRef(id)*mult));
+ const itemCost=k=>k===''?0:Math.max(100,Math.round(C.shop.item*C.market.itemRar[C.items[Number(k)].r]*mult));
+ const tmCost=t=>t.k?Math.ceil(tmReserve*3**(t.lv-1)):0;
+ const memo=new Map();
+ function acquire(id,seen=new Set()){
+  if(memo.has(id))return memo.get(id);
+  const sp=GD.SPECIES[id];let best={pkl:price(id),source:sp.name,steps:['Buy '+sp.name+' (reference estimate)'],evoItems:[]};
+  if(q.evolution!=='direct'&&!seen.has(id)){
+   const prev=GD.PRE[id],p=GD.SPECIES[prev],edge=(GD.EVO[prev]||[]).find(e=>e.to===id);
+   if(p&&edge){const base=acquire(prev,new Set([...seen,id])),stone=C.stones.find(x=>x.n===edge.how),trade=edge.how==='Trade',needed=edge.lv||(edge.how==='Friendship'?15:30),variants=[];
+    if(stone||trade){const name=stone?.n||'Linking Cord';variants.push({cost:C.shop.stone,note:name+' (geode allowance; exact stone not guaranteed)',item:name});}
+    else if(lv>=needed)variants.push({cost:0,note:'Evolve at Lv '+needed});
+    const k=core.evoItem(prev,id),ik=C.items.findIndex(x=>x.k===k);if(ik>=0)variants.push({cost:itemCost(String(ik)),note:'Consume '+C.items[ik].n,item:C.items[ik].n});
+    for(const v of variants){const cost=base.pkl+v.cost;if(cost<best.pkl)best={pkl:cost,source:base.source,steps:[...base.steps,v.note+' → '+sp.name],evoItems:[...base.evoItems,...(v.item?[v.item]:[])]};}
+   }
+  }memo.set(id,best);return best;
+ }
+ const objective=q.objective||'balanced',goals=objective==='balanced'?['expectedCooldown','evadeBulk','atk','def']:objective==='offense'?['atk','expectedCooldown','crit']:objective==='tank'?['evadeBulk','def','atk']:['expectedCooldown','atk','evadeBulk'];
+ const candidates=[];let evaluated=0;
+ const scoreRaw=(v)=>{const speed=1/Math.max(.05,v.expectedCooldown),bulk=v.evadeBulk,attack=v.atk;
+  return objective==='offense'?Math.pow(attack,.8)*Math.pow(speed,.55)*Math.pow(bulk,.18):objective==='tank'?Math.pow(bulk,.8)*Math.pow(attack,.25):objective==='speed'?Math.pow(speed,.85)*Math.pow(attack,.4)*Math.pow(bulk,.2):Math.pow(attack,.55)*Math.pow(speed,.3)*Math.pow(bulk,.4);};
+ for(const sp of all){
+  if(sp.rar<minRarity||sp.rar>maxRarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.type&&!sp.types.includes(q.type)||q.finalOnly&&(GD.EVO[sp.id]||[]).length)continue;
+  const acq=acquire(sp.id);if(acq.pkl>budget)continue;
+  const megaChance=(C.mega.ok[sp.rar]||0)/100,attempts=q.megaCost==='attempt'?1:1/Math.max(.01,megaChance);
+  const forms=[0,...(maxMega&&GD.MEGA_SP[sp.id]?[1]:[]),...(maxMega&&GD.MEGA_SP2[sp.id]?[2]:[])];
+  const config={lv,ability:rank,mode:mode.id,hpPct:100,tactic:q.tactic||'equilibrado',opponentTactic:'equilibrado',synergy:1,incoming:'',attackerRange:'melee',incomingKind:'basic',weaknessPolicy:false};
+  const variants=new Map();
+  for(const goal of goals){for(const tmRank of new Set([1,rank])){const qs={...config,metric:goal,tm1:'auto',tm2:'auto',tm1rank:tmRank,tm2rank:tmRank};const ts=rankTms(sp,qs,lv);if(ts){variants.set(JSON.stringify(ts),ts);for(let i=0;i<2;i++){const one=ts.map((t,j)=>i===j?t:{k:'',lv:1});variants.set(JSON.stringify(one),one);}}}}
+  variants.set('none',[{k:'',lv:1},{k:'',lv:1}]);
+  const choices=['',...C.items.map((it,k)=>String(k)).filter(k=>C.items[Number(k)].r<=bounded(q.maxItemRarity,0,5,5))];
+  // Prune items only when their full native held effect and effective level agree; retain cheaper representative.
+  const itemMap=new Map();
+  for(const item of choices){const it=item===''?null:{k:Number(item),r:C.items[Number(item)].r},h=core.heldFx(it,sp.id),bonus=core.itemLv(it,sp.id),eff=!mode.cap?lv+bonus:mode.kind==='arena'?Math.min(lv,mode.cap)+bonus:Math.min(lv+bonus,mode.cap),key=JSON.stringify([eff,h||null]);if(!itemMap.has(key)||itemCost(item)<itemCost(itemMap.get(key)))itemMap.set(key,item);}
+  const options=[];
+  for(const form of forms){
+   const megaPKL=form?Math.ceil(C.mega.price*attempts):0,sol=form?C.mega.sol*attempts:0;if(sol>solBudget+1e-9||acq.pkl+megaPKL>budget)continue;
+   for(const item of itemMap.values()){
+    const equipment=itemCost(item);if(acq.pkl+megaPKL+equipment>budget)continue;
+    for(const tms of variants.values()){
+     const tm=tms.reduce((sum,t)=>sum+tmCost(t),0),cost=acq.pkl+equipment+tm+megaPKL;if(cost>budget)continue;
+     const v=rankOne(config,sp,form,item,tms);evaluated++;
+     const row={...v,score:scoreRaw(v),cost,sol,acquisition:acq,equipment,tm,megaPKL,megaChance:form?megaChance:null,build:{id:sp.id,lv,ability:rank,item,tms,mega:form}};
+     options.push(row);
+    }
+   }
+  }
+  // Pareto frontier for each form: budget and battle score; preserve diverse transformed typing.
+  const groups=new Map();for(const r of options){const k=JSON.stringify([r.form,r.types]);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
+  for(const group of groups.values()){group.sort((a,b)=>a.cost-b.cost||b.score-a.score);let best=-Infinity;for(const r of group)if(r.score>best+1e-9){candidates.push(r);best=r.score;}}
+ }
+ const maxScore=Math.max(1,...candidates.map(r=>r.score)),norm=r=>r.score/maxScore;
+ // Beam search: multiple price/score lanes, distinct species, at most one Mega, coverage and shared weaknesses.
+ function evaluate(team){
+  const covered=types.filter(t=>team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))).length;
+  const exposed=types.reduce((n,t)=>n+Math.max(0,team.filter(r=>GD.eff(t,r.types)>1).length-team.filter(r=>GD.eff(t,r.types)<1).length-1),0);
+  const ranged=team.filter(r=>r.ranged).length,blend=q.mixed&&team.length>1&&(ranged===0||ranged===team.length)?-.06:0;
+  const synergy=Math.max(0,...types.map(t=>team.filter(r=>r.types.includes(t)).length));
+  return team.reduce((n,r)=>n+norm(r),0)+.32*covered/Math.max(1,types.length)-.035*exposed+blend+.018*Math.max(0,synergy-2);
+ }
+ // Restrict search to a broad, budget-aware shortlist: best builds per price band, type and role, plus cheapest.
+ const shortlist=new Map(),put=r=>shortlist.set(r.id+':'+r.form+':'+r.build.item+':'+JSON.stringify(r.build.tms),r);
+ const bands=[budget/24,budget/12,budget/8,budget/6,budget/4,budget/2,budget];
+ for(const cap of bands){const pool=candidates.filter(r=>r.cost<=cap).sort((a,b)=>b.score-a.score||a.cost-b.cost);pool.slice(0,55).forEach(put);for(const t of types)pool.filter(r=>r.types.includes(t)).slice(0,3).forEach(put);}
+ candidates.slice().sort((a,b)=>a.cost-b.cost||b.score-a.score).slice(0,80).forEach(put);
+ const pool=[...shortlist.values()];
+ let beam=[{team:[],cost:0,sol:0,mega:0,value:0}],deepest=beam;
+ for(let depth=0;depth<size;depth++){
+  const buckets=new Map(),seen=new Set();
+  for(const state of beam)for(const r of pool){if(state.cost+r.cost>budget||state.sol+r.sol>solBudget+1e-9||state.mega+Boolean(r.form)>maxMega||state.team.some(x=>x.id===r.id))continue;
+   const team=[...state.team,r],cost=state.cost+r.cost,sol=state.sol+r.sol,mega=state.mega+Number(!!r.form),sig=team.map(x=>x.id+':'+x.form+':'+x.cost+':'+x.score).sort().join('|');if(seen.has(sig))continue;seen.add(sig);
+   const value=evaluate(team),bin=Math.min(15,Math.floor(cost/Math.max(1,budget)*16)),key=bin+':'+mega;
+   const bucket=buckets.get(key)||[];bucket.push({team,cost,sol,mega,value});bucket.sort((a,b)=>b.value-a.value||a.cost-b.cost);if(bucket.length>3)bucket.pop();buckets.set(key,bucket);
+  }
+  beam=[...buckets.values()].flat().sort((a,b)=>b.value-a.value||a.cost-b.cost).slice(0,48);if(!beam.length)break;deepest=beam;
+ }
+ const best=deepest[0];return {team:best.team.sort((a,b)=>b.expectedCooldown-a.expectedCooldown),cost:best.cost,sol:best.sol,score:best.value,complete:best.team.length===size,size,budget,evaluated,candidates:candidates.length,shortlist:pool.length,coverage:types.filter(t=>best.team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))),weak:types.filter(t=>best.team.some(r=>GD.eff(t,r.types)>1)&&!best.team.some(r=>GD.eff(t,r.types)<1)),candy:best.team.length*C.abCandy*(rank===3?3:rank===2?1:0),tmReserve,priceFactor:mult,megaCost:q.megaCost,mode:mode.name,stone:C.shop.stone,tmCase:C.shop.tm,megaAttempt:C.mega.price,megaSOL:C.mega.sol};
+}
 function timingFor(id,ranged,load=false){
  const anim=ranged?'Shoot':'Attack';
  if(load&&!loadedTimings.has(id)){try{importScripts(upstream+'sp/'+encodeURIComponent(id)+'.js');if(self.SPRITE_T[id])loadedTimings.add(id);}catch{}}
@@ -184,6 +270,7 @@ function benchmark(config, job) {
 self.onmessage = ({data}) => {
   try {
     if(!runtime) throw Error('The upstream battle engine is unavailable.');
+    if(data.type==='team-plan'){try{send('team-plan',{job:data.job,result:teamPlan(data.config)});}catch(e){send('team-plan',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-rank'){try{send('dex-rank',{job:data.job,result:dexRank(data.config)});}catch(e){send('dex-rank',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-preview'){try{send('dex-preview',{job:data.job,result:dexPreview(data.config)});}catch(e){send('dex-preview',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-timing'){const id=String(data.id);if(!GD.SPECIES[id])return;send('dex-timing',{job:data.job,result:timingFor(id,GD.ROLES[GD.SPECIES[id].role].ranged,true)});return;}
