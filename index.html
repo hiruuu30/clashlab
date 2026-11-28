@@ -71,22 +71,27 @@
   </div>
   <footer class="legal">Unofficial PokeClash League simulator · Local battles · <a href="https://pokeclashleague.xyz/" target="_blank" rel="noopener">PokeClash League</a> · <a href="https://github.com/PMDCollab/SpriteCollab" target="_blank" rel="noopener">SpriteCollab artists</a> (<a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>) · <a href="https://pokeclashleague.xyz/#credits" target="_blank" rel="noopener">Game asset credits</a></footer>
 </main>
-<dialog id="editor"><form method="dialog" id="editor-form">
-  <header class="dialog-head"><div><h2>Edit Pokémon</h2><p id="slot-label"></p></div><button value="cancel" formnovalidate class="icon-btn" aria-label="Close editor">×</button></header>
+<dialog id="editor" aria-labelledby="editor-title"><form method="dialog" id="editor-form">
+  <header class="dialog-head"><div><h2 id="editor-title">Edit Pokémon</h2><p id="slot-label"></p></div><button value="cancel" formnovalidate autofocus class="icon-btn" aria-label="Close editor">×</button></header>
   <div class="editor-fields">
-    <label>Pokémon <input id="species-search" type="search" placeholder="Search Pokémon by name" autocomplete="off"><select id="species" size="5" aria-label="Matching Pokémon"></select></label>
+    <div class="editor-species">
+      <div class="editor-species-row"><label for="species">Pokémon</label><button class="quiet" type="button" id="species-find" aria-expanded="false" aria-controls="species-search">Search</button></div>
+      <input id="species-search" type="search" placeholder="Find Pokémon by name" autocomplete="off" aria-label="Search Pokémon by name" hidden>
+      <select id="species" aria-label="Matching Pokémon"></select>
+    </div>
     <div class="editor-meta" id="species-info"></div>
-    <div class="form-grid">
+    <div class="form-grid editor-core">
       <label>Level <input id="level" type="number" min="1" max="50" required></label>
       <label>Ability rank <select id="ability"><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></label>
       <label>Held item <select id="item"></select></label>
       <label>Mega form <select id="mega"></select></label>
     </div>
-    <p id="effective" class="hint"></p>
-    <div class="form-grid">
-      <label>TM slot 1 <select id="tm-one"></select></label><label>TM rank <select id="tm-one-level"><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></label>
-      <label>TM slot 2 <select id="tm-two"></select></label><label>TM rank <select id="tm-two-level"><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></label>
+    <p id="effective" class="hint" role="status"></p>
+    <div class="form-grid editor-tms">
+      <label>TM 1 <select id="tm-one"></select></label><label>Rank <select id="tm-one-level"><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></label>
+      <label>TM 2 <select id="tm-two"></select></label><label>Rank <select id="tm-two-level"><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></label>
     </div>
+    <details id="editor-equipment" class="editor-equipment" hidden><summary>Equipment effects</summary><div id="editor-effect-list"></div></details>
   </div>
   <footer class="dialog-actions"><button value="remove" formnovalidate id="remove" class="quiet">Remove</button><button value="save" class="primary">Save Pokémon</button></footer>
 </form></dialog>
