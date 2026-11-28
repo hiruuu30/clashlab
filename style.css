@@ -830,3 +830,15 @@ body:not(.match-view) .team-list{grid-row:4}
  .cx-stat-table .cx-table-name{min-height:48px}
 }
 @media(max-width:350px){.cx-range-switch button{font-size:16px;gap:3px;padding-inline:3px}.cx-range-switch button small{font-size:12px}.cx-section-nav button{font-size:14px}.cx-rank-grid b{font-size:22px}}
+
+/* Source-backed build details and held forms */
+.cx-form-note{padding:8px 10px;margin:8px 0!important;background:#18223a;border-left:3px solid #d5b653;color:#e0e7fa;font-size:17px;line-height:1.2}
+.cx-build .cx-checks{display:flex;align-items:center;gap:7px;margin:8px 0;color:#d4dff5;font-size:17px}
+.cx-build>button{min-height:42px}
+.cx-build-output{display:grid;gap:8px;margin-top:12px;overflow-wrap:anywhere}
+.cx-build-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cx-build-grid>div{background:#131a2e;border:1px solid #46527e;padding:8px 6px;display:grid;gap:5px}
+.cx-build-grid span{font-size:15px;color:#b4c3df}
+.cx-build-grid b{font:23px/1 var(--number);color:#ffdf72}
+.cx-build-output p{line-height:1.25;font-size:17px}
+@media(max-width:760px){.cx-build-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
