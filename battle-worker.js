@@ -167,7 +167,7 @@ function teamPlan(q,progress=()=>{}){
  const lookup=(map,key,name)=>{const v=Object.hasOwn(map,key)?map[key]:Object.hasOwn(map,name)?map[name]:null;return v!==null&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Math.ceil(Number(v)):null;};
  const price=id=>lookup(priceMap,id,GD.SPECIES[id].name)??Math.max(100,Math.round(core.mkRef(id)*mult));
  const itemCost=k=>k===''?0:lookup(itemMapOverride,C.items[Number(k)].k,C.items[Number(k)].n)??Math.max(100,Math.round(core.mkRef('it:'+k)*mult));
- const odds=core.TM_ODDS,tmPrice=k=>lookup(tmMap,k,skills[k])??(q.tmPricing==='manual'?tmReserve:Math.ceil(C.shop.tm/(3*(odds[GD.SKILL_R[k]]/100)/Object.values(GD.SKILL_R).filter(r=>r===GD.SKILL_R[k]).length)));
+ const odds=core.TM_ODDS,tmPrices=Object.fromEntries(Object.entries(GD.SKILL_R).map(([k,r])=>[k,lookup(tmMap,k,skills[k])??(q.tmPricing==='manual'?tmReserve:Math.ceil(C.shop.tm*100*Object.values(GD.SKILL_R).filter(x=>x===r).length/(3*odds[r])))])),tmPrice=k=>tmPrices[k];
  const tmCost=t=>t.k?Math.ceil(tmPrice(t.k)*3**(t.lv-1)):0;
  const xpTo=(a,b)=>{let xp=0;for(let l=a;l<b;l++)xp+=Math.round(40+l*12+l*l*1.5);return xp;};
  const train=(a,b)=>Math.ceil(xpTo(a,b)/C.train.xp)*C.train.candy;
