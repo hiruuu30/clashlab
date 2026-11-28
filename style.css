@@ -1278,3 +1278,5 @@ body:not(.match-view) .team-list{grid-row:4}
 .stb-apply{display:grid;grid-template-columns:1fr 1fr;gap:6px;position:sticky;bottom:0;background:#171c32;padding:5px 0}
 .stb-apply button{min-height:40px;font-size:16px}
 @media(max-width:760px){.stb-dialog{height:calc(100dvh - 12px)}.stb-dialog .analysis-controls{max-height:54dvh}.stb-member-head{grid-template-columns:32px minmax(0,1fr) auto}.stb-member-head img{width:32px;height:32px}.stb-member-head strong{font-size:18px}.stb-member-head>b{font-size:16px}.stb-total strong{font-size:20px}.stb-member{padding:5px}.stb-loadout b{font-size:15px}}
+
+.stb-price-editor{margin-top:6px;border-top:1px solid #46527e;padding-top:5px}.stb-price-editor summary{cursor:pointer}.stb-price-editor textarea{width:100%;min-height:100px;font:14px/1.25 monospace;background:#111527;color:#dce4fb;padding:5px;border:1px solid #46527e;resize:vertical}.stb-alt-label{display:grid;gap:3px;color:var(--dim);font-size:15px}.stb-alt-label select{min-height:34px;font-size:16px}.stb-member .stb-statline{font-size:14px;gap:3px 8px}
