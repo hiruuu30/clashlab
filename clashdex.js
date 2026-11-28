@@ -83,8 +83,8 @@ export function mountDex(api){
   sync();
  }
  function sync(){
-  $('#dex-query').value=f.q;
-  all('[data-filter]').forEach(el=>{const v=f[el.dataset.filter];if(el.type==='checkbox')el.checked=!!v;else el.value=v??'';});
+  if($('#dex-query').value!==f.q)$('#dex-query').value=f.q;
+  all('[data-filter]').forEach(el=>{const v=f[el.dataset.filter];if(el.type==='checkbox')el.checked=!!v;else if(el.value!==String(v??''))el.value=v??'';});
   $('[data-direction]').textContent=f.dir==='asc'?'↑':'↓';
   $('[data-direction]').title=f.dir==='asc'?'Ascending · click for descending':'Descending · click for ascending';
   all('[data-sort]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sort===f.sort)));
@@ -159,7 +159,7 @@ export function mountDex(api){
  <div class="cx-hero" style="--rar:${color(p.rarityColor)}"><div class="cx-hero-art">${pic(p,'cx-hero-sprite')}<span>#${esc(p.speciesId)}</span></div><div><div class="cx-rarity">${esc(p.rarity)} ${p.form?' / MEGA':''}</div><h3>${esc(p.name)}</h3><div class="cx-type-line">${p.types.map(t=>typeChip(c,t)).join('')}</div><div class="cx-hero-role">${rangeChip(p)} <span>${esc(p.role)}</span></div><p class="cx-muted">${p.ranged?'Attacks from range (basic range < 300; base cooldown ×1.5).':'Fights up close (basic range < 62; standard base cooldown).'}</p><p class="cx-muted">${esc(p.roleDescription||'')}</p></div></div>
  ${forms.length>1?'<div class="cx-forms">'+forms.map(e=>'<button data-pokemon="'+esc(e.key)+'" aria-pressed="'+(e.key===selected)+'">'+esc(e.form?e.name:'Base form')+'</button>').join('')+'</div>':''}
  ${p.stone?'<p class="cx-muted">Mega stone: '+esc(p.stone)+'</p>':''}
- <div class="cx-section-nav" role="group" aria-label="Profile sections">${[['overview','Stats'],['matchups','Matchups'],['moves','Moves & TMs'],['items','Items & build']].map(([k,l])=>'<button data-section="'+k+'" aria-pressed="'+(section===k)+'">'+l+'</button>').join('')}</div><section class="cx-panel" data-pane="overview"><div class="cx-panel-head"><h3>Statistics</h3><b class="cx-bst">BST ${num(p.bst)}</b></div><div class="cx-tabs"><button data-tab="battle" aria-pressed="${tab==='battle'}">Battle stats</button><button data-tab="base" aria-pressed="${tab==='base'}">Original base stats</button></div>
+ <div class="cx-section-nav" role="group" aria-label="Profile sections">${[['overview','Stats'],['matchups','Matchups'],['moves','Moves & TMs'],['items','Items & team']].map(([k,l])=>'<button data-section="'+k+'" aria-pressed="'+(section===k)+'">'+l+'</button>').join('')}</div><section class="cx-panel" data-pane="overview"><div class="cx-panel-head"><h3>Statistics</h3><b class="cx-bst">BST ${num(p.bst)}</b></div><div class="cx-tabs"><button data-tab="battle" aria-pressed="${tab==='battle'}">Battle stats</button><button data-tab="base" aria-pressed="${tab==='base'}">Original base stats</button></div>
  ${tab==='battle'?'<div class="cx-level"><label for="cx-level">Preview level <b>'+level+'</b></label><input id="cx-level" type="range" min="1" max="50" value="'+level+'" aria-label="Preview battle level"><output>Lv '+level+'</output></div>':'<p class="cx-muted">Six original base stats; total is independent of level.</p>'}
  <div class="cx-stat-list" data-stat-list>${statGroup(p)}</div><p class="cx-muted">${tab==='battle'?'Unbuffed PokeClash stats. HP, ATK and DEF scale with level; SPD stays fixed. No items, abilities or TM buffs. Combat Speed is capped at 130; original Speed is available separately.':'Shared 0–255+ scale. Mega deltas compare with the base form.'}</p><div class="cx-summary"><span>Speed rank <b>#${rank}/${pool.length}</b></span><span>Coverage <b>${metric(c,p,'coverage')}/18</b></span><span>Resists <b>${metric(c,p,'resist')}/18</b></span></div><h4 class="cx-rank-heading">Catalog ranks · ${p.form?'Mega forms':'Base Pokémon'}</h4><div class="cx-rank-grid">${rankRows}</div><p class="cx-muted">Tied values share a rank. Bulk and attack-rate indexes are scouting proxies, not combat predictions.</p></section>
  <section class="cx-panel" data-pane="matchups"><h3>Type matchups</h3>${matchup(p)}<p class="cx-muted">Actual PokeClash type-only multipliers. Items and other modifiers are excluded; immunities deal reduced damage.</p></section>
@@ -167,7 +167,7 @@ export function mountDex(api){
  <section class="cx-panel" data-pane="moves"><h3>Innate & compatible TMs</h3><p class="cx-innate">Innate · ${esc(c.skills[p.innate]||p.innate)}</p><div class="cx-tms">${p.learn.map(k=>'<details><summary>'+esc(c.skills[k]||k)+(k===p.innate?' · Innate':'')+'</summary>'+[1,2,3].map(l=>'<p>Rank '+['I','II','III'][l-1]+' · '+esc(api.tmEffect(k,l))+'</p>').join('')+'</details>').join('')}</div></section>
  <section class="cx-panel" data-pane="items"><h3>Item scouting</h3><p class="cx-muted">Highest effective-level bonuses for the species, not a power ranking. Combat effect tags are game data.</p><div class="cx-items">${itemRows.map(({it,bonus,active})=>'<details><summary>'+esc(it.name)+' <b>+'+bonus+' Lv</b></summary><p>'+esc((it.tags||[]).join(' · ')||'No listed combat effect')+'</p><p>'+ (active?'Combat effect applies to this species.':'No species-specific active effect confirmed.')+'</p></details>').join('')||'<p>No applicable items found.</p>'}</div></section>
  <section class="cx-panel" data-pane="overview"><h3>Evolution line</h3><div class="cx-evo">${evolution(p)}</div></section>
- <section class="cx-panel cx-team-panel" data-pane="items"><h3>Build your team</h3><div class="cx-team-grid">${teamActions(p)}</div><p class="cx-muted" data-dex-notice role="status">Choose a replacement if the roster is full. Adds the selected form; no other equipment is changed.</p></section>`;
+ <section class="cx-panel cx-team-panel" data-pane="items"><h3>Build your team</h3><div class="cx-team-grid">${teamActions(p)}</div><p class="cx-muted" data-dex-notice role="status">Choose a replacement if the roster is full. Adds the selected form with a default build; other roster slots are unchanged.</p></section>`;
   all('[data-pane]').forEach(el=>el.hidden=el.dataset.pane!==section);
   updateCount();
  }
@@ -184,11 +184,11 @@ export function mountDex(api){
   if(b.hasAttribute('data-reset')){f=defaults();$('[data-preset]').value='';update();return;}
   if(b.hasAttribute('data-range')){f.ranged=b.dataset.range;$('[data-preset]').value='';update();return;}
   if(b.dataset.layout){layout=b.dataset.layout;renderList();return;}
-  if(b.dataset.tableSort){f.dir=f.sort===b.dataset.tableSort&&f.dir==='desc'?'asc':'desc';f.sort=b.dataset.tableSort;update();return;}
+  if(b.dataset.tableSort){$('[data-preset]').value='';f.dir=f.sort===b.dataset.tableSort&&f.dir==='desc'?'asc':'desc';f.sort=b.dataset.tableSort;update();return;}
   if(b.dataset.clearFilter){const k=b.dataset.clearFilter;f[k]=defaults()[k];$('[data-preset]').value='';update();return;}
-  if(b.dataset.section){section=b.dataset.section;renderProfile();api.requestPortraits();return;}
-  if(b.dataset.sort){f.sort=b.dataset.sort;f.dir=f.sort==='id'||f.sort==='name'?'asc':'desc';update();return;}
-  if(b.hasAttribute('data-direction')){f.dir=f.dir==='asc'?'desc':'asc';update();return;}
+  if(b.dataset.section){section=b.dataset.section;renderProfile();$('[data-section="'+section+'"]')?.focus({preventScroll:true});api.requestPortraits();return;}
+  if(b.dataset.sort){$('[data-preset]').value='';f.sort=b.dataset.sort;f.dir=f.sort==='id'||f.sort==='name'?'asc':'desc';update();return;}
+  if(b.hasAttribute('data-direction')){$('[data-preset]').value='';f.dir=f.dir==='asc'?'desc':'asc';update();return;}
   if(b.dataset.pokemon){showProfile(b.dataset.pokemon);return;}
   if(b.dataset.favorite){const k=b.dataset.favorite;favorites.has(k)?favorites.delete(k):favorites.add(k);saveFavorites(favorites);update(false);return;}
   if(b.id==='dex-more'){limit+=30;renderList();return;}
@@ -204,10 +204,10 @@ export function mountDex(api){
  d.addEventListener('input',e=>{
   const el=e.target;
   if(el.id==='cx-level'){level=Number(el.value);$('[data-stat-list]').innerHTML=statGroup(byKey.get(selected));el.previousElementSibling.querySelector('b').textContent=level;el.nextElementSibling.textContent='Lv '+level;return;}
-  if(el.id==='dex-query'){f.q=el.value;limit=30;renderList();return;}
-  if(el.dataset.filter&&el.type==='number'){f[el.dataset.filter]=el.value;limit=30;renderList();}
+  if(el.id==='dex-query'){$('[data-preset]').value='';f.q=el.value;limit=30;renderList();return;}
+  if(el.dataset.filter&&el.type==='number'){$('[data-preset]').value='';f[el.dataset.filter]=el.value;limit=30;renderList();}
  });
- d.addEventListener('change',e=>{const el=e.target,k=el.dataset.filter;if(el.hasAttribute('data-preset')){const v=el.value;if(!v)return;const preset={melee:{ranged:'melee',sort:'spd'},ranged:{ranged:'ranged',sort:'pressure'},tank:{sort:'bulk'},coverage:{sort:'coverage'},resist:{sort:'weak',dir:'asc'},mega:{forms:'mega',sort:'bst'}}[v];if(preset){f={...defaults(),...preset,dir:preset.dir||'desc'};update();}return;}if(!k||el.type==='number')return;$('[data-preset]').value='';f[k]=el.type==='checkbox'?el.checked:el.value;if(k==='sort')f.dir=['id','name'].includes(f.sort)?'asc':'desc';update();});
+ d.addEventListener('change',e=>{const el=e.target,k=el.dataset.filter;if(el.hasAttribute('data-preset')){const v=el.value;if(!v)return;const preset={melee:{ranged:'melee',sort:'spd'},ranged:{ranged:'ranged',sort:'pressure'},tank:{sort:'bulk'},coverage:{sort:'coverage'},resist:{sort:'weak',dir:'asc'},mega:{forms:'mega',sort:'bst'}}[v];if(preset){f={...defaults(),...preset,dir:preset.dir||'desc'};update();}return;}if(!k||el.type==='number')return;$('[data-preset]').value='';f[k]=el.type==='checkbox'?el.checked:el.value;if(k==='sort')f.dir=['id','name','weak'].includes(f.sort)?'asc':'desc';update();});
  return {open(){
   c=api.getCatalog();if(!c)return;
   entries=entriesFor(c);byKey=new Map(entries.map(p=>[p.key,p]));bySpecies=new Map(c.species.map(p=>[p.id,{...p,key:p.id+':0',speciesId:p.id,form:0}]));
