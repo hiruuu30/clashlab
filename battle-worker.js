@@ -317,12 +317,12 @@ function teamRate(q){
  const {core,modes}=runtime,mode=modes.find(m=>m.id===q.mode)||modes[0],all=Object.values(GD.SPECIES),types=Object.keys(GD.TYPES);
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),integer=(v,a,b)=>clamp(Math.trunc(Number(v)||a),a,b);
  const round=(n,p=0)=>Number(n.toFixed(p)),raw=Array.isArray(q.team)?q.team.slice(0,6):[],other=Array.isArray(q.opponent)?q.opponent.slice(0,6):[];
- const normalizeTactic=k=>Object.hasOwn(GD.TACTICS,k)?k:'equilibrado',tactic=normalizeTactic(q.tactic),opponentTactic=normalizeTactic(q.opponentTactic);
+ const normalizeTactic=k=>Object.hasOwn(GD.TACTICS,k)?k:'equilibrado',tactic=normalizeTactic(q.tactic),opponentTactic=q.compare===false?tactic:normalizeTactic(q.opponentTactic);
  const issues=[],strengths=[],suggestions=[],rows=[],ids=new Set();let usedMega=false,megaCount=0;
  const issue=(severity,title,detail,slot=null)=>issues.push({severity,title,detail,slot});
  function clean(m,slot,report){
   if(!m||!GD.SPECIES[m.id])return null;
-  const sp=GD.SPECIES[m.id],lv=integer(m.lv,1,50),ability=integer(m.ability,1,3),item=m.item!==''&&core.CFG.items[Number(m.item)]?String(Number(m.item)):'',form=Number(m.mega)===2&&GD.MEGA_SP2[m.id]?2:Number(m.mega)>=1&&GD.MEGA_SP[m.id]?1:0;
+  const sp=GD.SPECIES[m.id],lv=integer(m.lv,1,50),ability=integer(m.ability,1,3),item=m.item!=null&&m.item!==''&&core.CFG.items[Number(m.item)]?String(Number(m.item)):'',form=Number(m.mega)===2&&GD.MEGA_SP2[m.id]?2:Number(m.mega)>=1&&GD.MEGA_SP[m.id]?1:0;
   const seen=new Set([GD.innateOf(m.id)]),tms=[0,1].map(i=>{const t=m.tms?.[i];if(!t?.k)return {k:'',lv:1};if((i===1&&lv<12)||seen.has(t.k)||!GD.learnOf(m.id).includes(t.k)){if(report)issue('high',sp.name+' has an unavailable TM','Slot '+(i+1)+' cannot use '+(skills[t.k]||t.k)+' at this level or duplicates its innate/other TM.',slot);return {k:'',lv:1};}seen.add(t.k);return {k:t.k,lv:integer(t.lv,1,3)};});
   if(report&&m.item!==''&&m.item!=null&&!core.CFG.items[Number(m.item)])issue('high',sp.name+' has an unknown item','Select a valid held item.',slot);
   if(report&&Number(m.mega)>0&&!form)issue('high',sp.name+' has an unavailable Mega','Select an available Mega form or disable it.',slot);
@@ -397,7 +397,7 @@ function teamRate(q){
   const q1={...cfg(m,r.form),metric:purpose==='tank'?'evadeBulk':'expectedCooldown',tm1:'auto',tm2:'auto',tm1rank:m.ability,tm2rank:m.ability};
   const recommended=rankTms(sp,q1,m.lv)||m.tms,alternates=[m.tms,recommended];
   const alt=rankTms(sp,{...q1,metric:purpose==='tank'?'def':'atk'},m.lv);if(alt)alternates.push(alt);
-  const items=rankItemChoices({...q1,item:'auto'},sp),before={...r,pressure:r.pressure/r.synergy},baseScore=utility(before,purpose);
+  const items=['',...core.CFG.items.map((_,i)=>String(i))],before={...r,pressure:r.pressure/r.synergy},baseScore=utility(before,purpose);
   let best=before,bestScore=baseScore;
   for(const item of items)for(const tms of alternates){const v=projection({...m,item,tms},r.slot,r.form);v.ref=r.ref;const value=utility(v,purpose);if(value>bestScore+1e-8){best=v;bestScore=value;}}
   if(bestScore>baseScore+Math.log(1.04)){
@@ -421,11 +421,12 @@ function teamRate(q){
  if(q.compare!==false)for(let i=0;i<other.length;i++){const m=clean(other[i],i,false);if(!m)continue;const form=m.mega&&!foeMega?m.mega:0;if(form)foeMega=true;foe.push(projection(m,i,form,opponentTactic,tactic));}
  const matchups=foe.map(f=>{
   const counters=rows.map(r=>({slot:r.slot,name:r.name,out:out(r,f.types),in:incoming(r,f.types),special:r.combat.specialType?GD.eff(r.combat.specialType,f.types):out(r,f.types),enemySpecial:f.combat.specialType?GD.eff(f.combat.specialType,r.types):incoming(r,f.types),pressure:r.pressure}));
-  counters.sort((a,b)=>Math.log2(Math.max(a.out,a.special)/Math.max(a.in,a.enemySpecial))-Math.log2(Math.max(b.out,b.special)/Math.max(b.in,b.enemySpecial))||a.pressure-b.pressure);counters.reverse();
+  counters.sort((a,b)=>Math.log2(Math.max(b.out,b.special)/Math.max(b.in,b.enemySpecial))-Math.log2(Math.max(a.out,a.special)/Math.max(a.in,a.enemySpecial))||b.pressure-a.pressure||a.slot-b.slot);
   const best=counters[0],threat=counters.every(x=>Math.max(x.in,x.enemySpecial)>Math.max(x.out,x.special));
   if(threat)issue('high','Difficult matchup: '+f.name,'Every member has a worse best-type exchange against this opponent. Inspect stats, item effects and actual battle positioning.');
   return {name:f.name,id:f.id,types:f.types,slot:f.slot,best,threat,counters};
  });
+ if(matchups.length&&GD.TACTICS[opponentTactic].beats===tactic){const counter=Object.keys(GD.TACTICS).find(k=>GD.TACTICS[k].beats===opponentTactic);issue('medium','Opponent reads your tactic','The opposing tactic has a native +15% ATK read advantage. Consider '+(GD.TACTICS[counter]?.n||counter)+' to gain the read instead; compare the corresponding ATK/DEF tradeoffs.');}
  const lead=matchups.length?matchups[0].best:rows.slice().sort((a,b)=>b.memberGrade-a.memberGrade)[0];
  if(lead)strengths.push('Suggested lead: '+lead.name+(matchups.length?' for the opposing first slot based on type exchange.':' based on the neutral member rubric.'));
  const severity={high:0,medium:1,info:2};issues.sort((a,b)=>severity[a.severity]-severity[b.severity]);
