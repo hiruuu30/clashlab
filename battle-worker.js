@@ -83,7 +83,7 @@ function dexPreview(q) {
 function dexRank(q) {
  const candidates=[],skipped={incompatible:0,locked:0,inactive:0},lv=Math.max(1,Math.min(50,Math.trunc(Number(q.lv)||1)));
  const selected=(q.tms||[]).filter(t=>t&&t.k);
- if(selected.length>1&&lv<12)throw Error('Second TM requires base level 12.');
+ if((selected.length>1||q.tm2)&&lv<12)throw Error('Second TM requires base level 12.');
  if(new Set(selected.map(t=>t.k)).size!==selected.length)throw Error('Select two different TMs.');
  const all=Object.values(GD.SPECIES), item=q.item===''?-1:Number(q.item);
  for(const sp of all){
