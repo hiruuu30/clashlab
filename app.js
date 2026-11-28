@@ -309,10 +309,10 @@ function ensureTeams() {
 }
 
 const dexPending=new Map();let dexJob=0;
-function requestDex(type,payload,onProgress){return new Promise((resolve,reject)=>{if(!workers||!catalog){reject(Error('Engine unavailable'));return;}const job=++dexJob;const timer=setTimeout(()=>{dexPending.delete(job);reject(Error('Engine request timed out'));},type==='team-plan'?180000:type==='dex-rank'?60000:15000);dexPending.set(job,{resolve,reject,timer,onProgress});workers.postMessage({type,job,...payload});});}
+function requestDex(type,payload,onProgress){return new Promise((resolve,reject)=>{if(!workers||!catalog){reject(Error('Engine unavailable'));return;}const job=++dexJob;const timer=setTimeout(()=>{dexPending.delete(job);reject(Error('Engine request timed out'));},type==='team-plan'?180000:type==='dex-rank'||type==='team-rate'?60000:15000);dexPending.set(job,{resolve,reject,timer,onProgress});workers.postMessage({type,job,...payload});});}
 function handle(message) {
   if(message.type==='team-plan-progress'){dexPending.get(message.job)?.onProgress?.(message.progress);return;}
-  if(message.type==='dex-preview'||message.type==='dex-timing'||message.type==='dex-rank'||message.type==='team-plan'){const p=dexPending.get(message.job);if(p){clearTimeout(p.timer);dexPending.delete(message.job);if(message.error)p.reject(Error(message.error));else p.resolve(message.result);}return;}
+  if(message.type==='dex-preview'||message.type==='dex-timing'||message.type==='dex-rank'||message.type==='team-plan'||message.type==='team-rate'){const p=dexPending.get(message.job);if(p){clearTimeout(p.timer);dexPending.delete(message.job);if(message.error)p.reject(Error(message.error));else p.resolve(message.result);}return;}
   if(message.type==='ready'){
     catalog=message;refTypes=Object.keys(message.typeMatrix||{});species=Object.fromEntries(message.species.map(x=>[x.id,x]));items=Object.fromEntries(message.items.map(x=>[x.k,x]));
     for(let i=0;i<2;i++)for(let j=0;j<presets[i].length;j++)if(!species[presets[i][j]])presets[i][j]=message.species[(i*6+j)%message.species.length].id;
@@ -556,7 +556,7 @@ $('editor-form').onsubmit=e=>{
 connect();
 
 const toolsBar=document.createElement('nav');toolsBar.className='lab-tools';toolsBar.setAttribute('aria-label','ClashLab tools');
-toolsBar.innerHTML='<button class="secondary dex-launch" id="dex-open" aria-label="Open ClashDex">ClashDex <span>Pokédex</span></button><details class="tool-menu"><summary>Analysis</summary><div class="tool-menu-content"><button class="secondary" id="team-inspect">Team analyzer</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="smart-team-open">Smart Team Builder</button><button class="secondary" id="build-open">Build Advisor</button></div></details><details class="tool-menu"><summary aria-label="Manage teams"><span class="desktop-menu-label">Manage teams</span><span class="mobile-menu-label">Teams</span></summary><div class="tool-menu-content"><button class="secondary" id="smart-team-manage">Smart Team Builder</button><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="team-import">Import JSON</button><button class="secondary" id="team-export">Export JSON</button></div></details>';
+toolsBar.innerHTML='<button class="secondary dex-launch" id="dex-open" aria-label="Open ClashDex">ClashDex <span>Pokédex</span></button><details class="tool-menu"><summary>Analysis</summary><div class="tool-menu-content"><button class="secondary" id="team-rate-open">Team Rater</button><button class="secondary" id="team-inspect">Team analyzer</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="smart-team-open">Smart Team Builder</button><button class="secondary" id="build-open">Build Advisor</button></div></details><details class="tool-menu"><summary aria-label="Manage teams"><span class="desktop-menu-label">Manage teams</span><span class="mobile-menu-label">Teams</span></summary><div class="tool-menu-content"><button class="secondary" id="smart-team-manage">Smart Team Builder</button><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="team-import">Import JSON</button><button class="secondary" id="team-export">Export JSON</button></div></details>';
 toolsBar.addEventListener('click',e=>{if(e.target.closest('button'))for(const d of toolsBar.querySelectorAll('details'))d.open=false;});
 toolsBar.addEventListener('toggle',e=>{if(e.target.tagName==='DETAILS'&&e.target.open)for(const d of toolsBar.querySelectorAll('details'))if(d!==e.target)d.open=false;},true);
 document.querySelector('.setup').before(toolsBar);
@@ -697,3 +697,55 @@ function openSmartTeam(){
  });
 }
 $('smart-team-open').onclick=openSmartTeam;$('smart-team-manage').onclick=openSmartTeam;
+
+/* Team Rater: the current manually edited roster is the input; all changes require confirmation. */
+function openTeamRater(){
+ if(!catalog||running||starting||bench)return;
+ const d=openTool('Team Rater','<div class="form-grid tr-controls"><label>Rate roster<select data-rate-side><option value="0">Team A</option><option value="1">Team B</option></select></label><label>Evaluation<select data-rate-compare><option value="opponent">Vs other team</option><option value="neutral">General team review</option></select></label></div><div class="tr-control-actions"><button class="primary" data-rate-run>Rate team</button><button class="quiet" data-rate-copy disabled>Copy report</button></div><p class="tr-status hint" data-rate-status role="status">Using the current roster, items, TMs, forms and tactics.</p><div data-results></div><p class="hint">Local, explainable rating engine. Letter grades are a weighted rubric, not win percentages. Offensive and defensive member scores compare against unheld, innate-only non-Mega same-rarity peers at the same level/rank. Neutral pressure uses estimated basic-attack cycles; passive bulk includes dodge but not full battle dynamics. Type tables omit temporary immunities and non-type effects. Only the first configured Mega is projected as evolved. Opponent review compares type exchanges, not simulated wins. Suggestions are tested within a bounded set of legal builds, and do not estimate acquisition costs.</p>');
+ d.classList.add('tr-dialog');
+ const out=d.querySelector('[data-results]'),status=d.querySelector('[data-rate-status]'),run=d.querySelector('[data-rate-run]'),copy=d.querySelector('[data-rate-copy]');
+ let result=null,snapshot=null,job=0,busy=false,pending=false;
+ const side=()=>Number(d.querySelector('[data-rate-side]').value),fmt=v=>Number(v).toLocaleString('en-US',{maximumFractionDigits:2}),h=escape;
+ const labels={offense:'Offense',defense:'Defense',coverage:'Coverage',balance:'Balance',loadout:'Loadout',depth:'Roster depth'};
+ const type=t=>h(catalog.types[t]||t);
+ const stamp=()=>JSON.stringify({side:side(),compare:d.querySelector('[data-rate-compare]').value,mode:config.mode,tactics:config.tactics,teams:config.teams});
+ const bar=(label,v)=>'<div class="tr-grade-row"><span>'+h(label)+'</span><i><b style="width:'+Math.max(0,Math.min(100,v))+'%"></b></i><strong>'+v+'</strong></div>';
+ const itemText=m=>m.item===''?'None':items[m.item]?.name||'Unknown';
+ const reportText=()=>{
+  if(!result||result.empty)return '';
+  return ['ClashLab Team Rater · '+title(snapshot.side),'Rating: '+result.letter+' / '+result.score+'/100 (rubric, not win probability)','Ruleset: '+result.mode,...Object.entries(result.grades).map(([k,v])=>labels[k]+': '+v+'/100'),'Strengths:',...result.strengths.map(x=>'- '+x),'Flaws:',...result.issues.map(x=>'- '+x.title+': '+x.detail),'Recommendations:',...result.suggestions.map(x=>'- '+x.title+': '+x.detail+(x.item?' Item: '+x.item+'; TMs: '+x.tms.join(', '):'')),result.reference].join('\n');
+ };
+ function render(r){
+  if(r.empty){out.innerHTML='<p class="cx-empty">No Pokémon in this team. Close the rater and add a Pokémon first.</p>';copy.disabled=true;return;}
+  const strengths=r.strengths.length?r.strengths.map(x=>'<p class="tr-strength">'+h(x)+'</p>').join(''):'<p class="hint">No notable strengths under the current rubric.</p>';
+  const flaws=r.issues.length?r.issues.map(x=>'<article class="tr-issue tr-'+h(x.severity)+'"><strong><span>'+h(x.severity==='high'?'Priority':x.severity==='medium'?'Review':'Tip')+'</span> '+h(x.title)+'</strong><p>'+h(x.detail)+'</p></article>').join(''):'<p class="tr-strength">No structural or loadout warnings found.</p>';
+  const mons=r.rows.map(m=>'<article class="tr-member"><div class="tr-member-head"><img data-portrait="'+h(m.id)+'" src="'+portrait(m.id)+'" width="34" height="34" alt=""><div><strong>'+h(m.name)+'</strong><small>'+h(m.rarity+' · '+m.role+' · '+(m.ranged?'Ranged':'Melee'))+'</small></div><b>'+m.memberGrade+'<small>/100</small></b></div><p class="tr-member-build">'+h(m.itemName)+' · '+h(m.tmNames.join(' / ')||'No extra TMs')+'</p><div class="tr-member-stats"><span>Lv '+m.effective+'</span><span>ATK '+fmt(m.atk)+'</span><span>DEF '+fmt(m.def)+'</span><span>HP '+fmt(m.hp)+'</span><span>CD '+fmt(m.expectedCooldown)+'s</span><span>Synergy +'+Math.round((m.synergy-1)*100)+'%</span></div><div class="tr-mini-grades">'+bar('Pressure',m.attackGrade)+bar('Bulk',m.bulkGrade)+'</div></article>').join('');
+  const typing='<table class="analysis-type-table tr-type-table"><thead><tr><th>Type</th><th>Hits</th><th>Weak</th><th>Resist</th></tr></thead><tbody>'+r.targetTable.map(t=>'<tr class="'+(t.weak&&!t.resist?'tr-exposed':'')+'"><th scope="row">'+type(t.type)+'</th><td>'+t.hit+'</td><td class="analysis-danger">'+t.weak+'</td><td class="analysis-good">'+t.resist+'</td></tr>').join('')+'</tbody></table>';
+  const recommend=r.suggestions.length?r.suggestions.map((x,i)=>'<article class="tr-recommend"><strong>'+h(x.title)+'</strong><p>'+h(x.detail)+'</p>'+(x.kind==='build'?'<p class="tr-rec-build">'+h(x.item)+' · '+h(x.tms.join(' / ')||'No extra TMs')+'</p>':'')+'<button class="quiet" data-rate-apply="'+i+'">'+(x.kind==='build'?'Apply suggested loadout':'Replace in slot '+(x.slot+1))+'</button></article>').join(''):'<p class="hint">No positive improvement found within the tested alternatives.</p>';
+  const vs=r.matchups.length?'<section class="tr-section"><h3>Opponent matchup review</h3><p class="hint">Best basic / forced special type multipliers, not damage or win rates.</p>'+r.matchups.map(m=>'<details class="tr-matchup"><summary><span>'+h(m.name)+'</span><b>'+h(m.best.name)+'</b><small>'+fmt(m.best.out)+'× out / '+fmt(m.best.in)+'× in'+(m.threat?' · Threat':'')+'</small></summary><table class="analysis-type-table"><thead><tr><th>Member</th><th>Basic out</th><th>Special out</th><th>Basic in</th><th>Special in</th></tr></thead><tbody>'+m.counters.map(x=>'<tr><th>'+h(x.name)+'</th><td>'+fmt(x.out)+'×</td><td>'+fmt(x.special)+'×</td><td>'+fmt(x.in)+'×</td><td>'+fmt(x.enemySpecial)+'×</td></tr>').join('')+'</tbody></table></details>').join('')+'</section>':'';
+  out.innerHTML='<div class="tr-score"><div class="tr-score-main"><strong>'+h(r.letter)+'</strong><span>'+r.score+'<small>/100</small></span><small>Team rubric</small></div><div class="tr-score-detail"><b>'+h(title(snapshot.side))+' · '+h(r.mode)+'</b><small>'+r.n+'/6 members · '+r.covered+'/'+Object.keys(catalog.types).length+' coverage</small><small>'+r.uncovered+' uncovered types · '+(r.n-r.ranged)+' melee / '+r.ranged+' ranged</small><small>Not a win probability</small></div></div><div class="tr-grades">'+Object.entries(r.grades).map(([k,v])=>bar(labels[k],v)).join('')+'</div><section class="tr-section"><h3>Strengths</h3>'+strengths+'</section><section class="tr-section"><h3>Flaws & priorities <small>'+r.issues.length+'</small></h3>'+flaws+'</section><section class="tr-section"><h3>Suggested changes</h3>'+recommend+'</section>'+vs+'<details class="tr-section tr-expand"><summary>Individual Pokémon ratings ('+r.n+')</summary>'+mons+'</details><details class="tr-section tr-expand"><summary>Full type coverage & weaknesses</summary>'+typing+'</details><details class="tr-section tr-expand"><summary>Rating methodology</summary><p>'+h(r.reference)+'</p><p>Overall weighting: offense 23%, defense 23%, coverage 18%, balance 14%, loadout 12%, roster depth 10%. Neutral pressure and bulk use log-scaled comparisons to the peer median (median = 50); other grades are structural rubric scores. These are not percentile rankings. Conditional combat effects are not fully represented.</p></details>';
+  copy.disabled=false;requestPortraits();
+ }
+ async function rate(){
+  if(busy){pending=true;return;}const current=side(),key=stamp(),serial=++job;busy=true;run.disabled=true;run.textContent='Analyzing…';copy.disabled=true;status.textContent='Inspecting roster, reference peers and legal alternatives…';out.innerHTML='';result=null;
+  const input={team:structuredClone(config.teams[current]),opponent:structuredClone(config.teams[1-current]),mode:config.mode,tactic:config.tactics[current],opponentTactic:config.tactics[1-current],compare:d.querySelector('[data-rate-compare]').value==='opponent'};
+  try{const r=await requestDex('team-rate',{config:input});if(serial!==job||!d.open)return;if(key!==stamp()){pending=true;return;}snapshot={side:current,key,input};result=r;status.textContent=r.empty?'Add Pokémon to rate this roster.':'Analysis complete · '+r.suggestions.length+' suggested changes';render(r);d.querySelector('.analysis-scroll').scrollTop=0;}
+  catch(e){if(d.open)status.textContent='Rating unavailable: '+e.message;}
+  finally{busy=false;run.disabled=false;run.textContent='Rate team';if(pending&&d.open){pending=false;rate();}}
+ }
+ d.addEventListener('change',e=>{if(e.target.matches('[data-rate-side],[data-rate-compare]'))rate();});
+ d.addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.hasAttribute('data-rate-run')){rate();return;}
+  if(b.hasAttribute('data-rate-copy')){try{await navigator.clipboard.writeText(reportText());status.textContent='Rating report copied.';}catch{status.textContent='Clipboard unavailable on this device.';}return;}
+  if(b.dataset.rateApply!==undefined&&result&&snapshot){
+   if(running||starting||bench||stamp()!==snapshot.key){status.textContent='Roster changed; rerate before applying.';return;}
+   const rec=result.suggestions[Number(b.dataset.rateApply)],m=rec?.build;if(!m||!species[m.id])return;
+   if(config.teams[snapshot.side].some((x,i)=>i!==rec.slot&&x?.id===m.id)){status.textContent='Cannot add a duplicate species.';return;}
+   if(!confirm(rec.title+'? This changes only slot '+(rec.slot+1)+'.'))return;
+   config.teams[snapshot.side][rec.slot]={...member(m.id),...m,tms:m.tms.map(t=>({...t}))};persist();clearBattle();rate();
+  }
+ });
+ rate();
+}
+$('team-rate-open').onclick=openTeamRater;
