@@ -772,3 +772,61 @@ body:not(.match-view) .team-list{grid-row:4}
 }
 @media(max-width:350px){.cx-browser,.cx-profile{padding-inline:7px}.cx-open{grid-template-columns:28px 36px minmax(0,1fr) auto}.cx-open img{width:36px;height:36px}.cx-row-text strong{font-size:19px}.cx-metric{font-size:23px}.cx-metric small{max-width:50px}.cx-type{font-size:10px;padding:3px 4px}.cx-hero{grid-template-columns:76px 1fr;gap:8px}.cx-hero-sprite{width:70px;height:70px}.cx-hero h3{font-size:13px}.cx-summary span{font-size:13px}.cx-panel{padding:9px 7px}}
 @media(prefers-reduced-motion:reduce){.cx-fill{animation:none}}
+
+
+/* ClashDex 3: accessible scouting navigation and compact range classification. */
+.cx-range-switch{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;border:1px solid #47537e;background:#101526;padding:3px;margin-bottom:9px}
+.cx-range-switch button,.cx-view-toggle button,.cx-section-nav button{border:1px solid transparent;background:transparent;color:#b8c5e1;min-height:42px;cursor:pointer;padding:5px 7px;line-height:1.1}
+.cx-range-switch button{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px;font-size:18px}
+.cx-range-switch button small{font-size:14px;color:#91a1c7}
+.cx-range-switch button[aria-pressed=true],.cx-view-toggle button[aria-pressed=true],.cx-section-nav button[aria-pressed=true]{background:#303a59;color:#ffdf72;border-color:#e3c553}
+.cx-range-switch button[aria-pressed=true] small{color:#ffdf72}
+.cx-range{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;font:600 11px/1.3 system-ui,sans-serif;padding:3px 5px;border:1px solid;border-radius:3px}
+.cx-range-m{color:#ffc394;background:#553626;border-color:#af7347}
+.cx-range-r{color:#a7d9ff;background:#203d5b;border-color:#5687b3}
+.cx-row-text .cx-type-line{align-items:center;gap:3px}
+.cx-scout-presets{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;margin-bottom:9px}
+.cx-scout-presets label{display:grid;gap:4px;color:#acb9da;font-size:17px}
+.cx-scout-presets select{width:100%;min-height:40px}
+.cx-view-toggle{display:flex;border:1px solid #47537e;background:#101526;padding:2px}
+.cx-view-toggle button{min-height:34px;font-size:17px;padding-inline:10px}
+.cx-active-filters{display:flex;flex-wrap:wrap;gap:5px}
+.cx-active-filters:not(:empty){margin-bottom:8px}
+.cx-active-filters button{border:1px solid #7887ae;background:#252f4b;color:#d7e2ff;font-size:15px;padding:4px 7px;min-height:30px;max-width:100%;overflow-wrap:anywhere}
+.cx-hero-role{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:19px;color:#d9e2fa}
+.cx-hero-role .cx-range{font-size:13px}
+.cx-section-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;padding:4px;border:1px solid #47537e;background:#151a2d;margin-top:12px;position:sticky;top:-14px;z-index:3;box-shadow:0 4px 10px #0004}
+.cx-section-nav button{font-size:17px;padding:6px 3px}
+.cx-rank-heading{margin:14px 0 7px!important;color:#c8d3ec}
+.cx-rank-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 0 10px}
+.cx-rank-grid>div{display:grid;gap:3px;text-align:center;background:#12182b;border:1px solid #3e4b72;padding:8px 3px}
+.cx-rank-grid span{color:#b9c7e3;font-size:16px}
+.cx-rank-grid b{color:#ffdf72;font:24px/1 var(--number)}
+.cx-rank-grid small{color:#93a3c6;font-size:13px}
+.cx-table-view{display:block}
+.cx-table-scroll{max-width:100%;overflow-x:auto;border:1px solid #46527e;scrollbar-width:thin}
+.cx-stat-table{border-collapse:collapse;width:100%;min-width:410px;font-size:18px;font-variant-numeric:tabular-nums}
+.cx-stat-table th,.cx-stat-table td{border-bottom:1px solid #3e4b72;padding:5px;text-align:right;background:#242b43}
+.cx-stat-table thead th{background:#141a2d;color:#ffdf72;font-weight:400}
+.cx-stat-table th:first-child{text-align:left;position:sticky;left:0;z-index:1;width:34%;min-width:120px;box-shadow:2px 0 #46527e}
+.cx-stat-table thead button{background:none;border:0;color:#ffdf72;padding:4px 1px;min-height:34px;font-size:16px;white-space:nowrap}
+.cx-stat-table .cx-table-name{display:grid;gap:5px;justify-items:start;text-align:left;border:0;background:transparent;color:inherit;width:100%;padding:4px;min-height:45px}
+.cx-table-name strong{font-size:18px;overflow-wrap:anywhere}
+.cx-stat-table tr.cx-table-selected>*{background:#354368}
+.cx-stat-table td{font-family:var(--number);font-size:23px}
+.cx-compare-pair .cx-range{margin-top:7px}
+.cx-compare-stat .cx-stat{grid-template-columns:minmax(75px,110px) minmax(0,1fr) minmax(44px,auto)}
+.cx-compare-stat .cx-stat>strong{font-size:21px}
+@media(max-width:760px){
+ .cx-range-switch button{min-height:44px;font-size:18px}
+ .cx-range-switch button small{font-size:14px}
+ .cx-section-nav{top:-10px;gap:2px}
+ .cx-section-nav button{min-height:44px;font-size:16px}
+ .cx-rank-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .cx-rank-grid>div{padding:6px 3px}
+ .cx-row-text .cx-range{font-size:10px}
+ .cx-profile-nav button{min-height:44px}
+ .cx-active-filters button{min-height:36px}
+ .cx-stat-table .cx-table-name{min-height:48px}
+}
+@media(max-width:350px){.cx-range-switch button{font-size:16px;gap:3px;padding-inline:3px}.cx-range-switch button small{font-size:12px}.cx-section-nav button{font-size:14px}.cx-rank-grid b{font-size:22px}}
