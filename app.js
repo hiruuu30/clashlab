@@ -309,8 +309,9 @@ function ensureTeams() {
 }
 
 const dexPending=new Map();let dexJob=0;
-function requestDex(type,payload){return new Promise((resolve,reject)=>{if(!workers||!catalog){reject(Error('Engine unavailable'));return;}const job=++dexJob;const timer=setTimeout(()=>{dexPending.delete(job);reject(Error('Engine request timed out'));},type==='team-plan'?180000:type==='dex-rank'?60000:15000);dexPending.set(job,{resolve,reject,timer});workers.postMessage({type,job,...payload});});}
+function requestDex(type,payload,onProgress){return new Promise((resolve,reject)=>{if(!workers||!catalog){reject(Error('Engine unavailable'));return;}const job=++dexJob;const timer=setTimeout(()=>{dexPending.delete(job);reject(Error('Engine request timed out'));},type==='team-plan'?180000:type==='dex-rank'?60000:15000);dexPending.set(job,{resolve,reject,timer,onProgress});workers.postMessage({type,job,...payload});});}
 function handle(message) {
+  if(message.type==='team-plan-progress'){dexPending.get(message.job)?.onProgress?.(message.progress);return;}
   if(message.type==='dex-preview'||message.type==='dex-timing'||message.type==='dex-rank'||message.type==='team-plan'){const p=dexPending.get(message.job);if(p){clearTimeout(p.timer);dexPending.delete(message.job);if(message.error)p.reject(Error(message.error));else p.resolve(message.result);}return;}
   if(message.type==='ready'){
     catalog=message;refTypes=Object.keys(message.typeMatrix||{});species=Object.fromEntries(message.species.map(x=>[x.id,x]));items=Object.fromEntries(message.items.map(x=>[x.k,x]));
@@ -684,7 +685,7 @@ function openSmartTeam(){
  d.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.hasAttribute('data-plan-run')){if(busy)return;const q=get();if(Number(q.minRarity)>Number(q.maxRarity)){status.textContent='Minimum rarity cannot exceed maximum rarity.';return;}if(!Number.isFinite(Number(q.budget))||Number(q.budget)<0){status.textContent='Enter a valid PKL budget.';return;}busy=true;b.disabled=true;b.textContent='Searching builds…';status.textContent='Evaluating legal budgeted teams locally…';out.innerHTML='';result=null;
-   try{result=await requestDex('team-plan',{config:q});appliedConfig=q;status.textContent='Search completed · '+fmt(result.candidates)+' budget-efficient candidates.';render();d.querySelector('.analysis-scroll').scrollTop=0;}catch(err){status.textContent='Unable to generate: '+err.message;}finally{busy=false;b.disabled=false;b.textContent='Generate smart team';}return;}
+   try{result=await requestDex('team-plan',{config:q},p=>{status.textContent=p.phase==='roster'?'Assembling roster · slot '+(p.depth+1)+' / '+p.size:'Scanning '+p.scanned+' / '+p.total+' species · '+fmt(p.evaluated)+' builds evaluated';});appliedConfig=q;status.textContent='Search completed · '+fmt(result.candidates)+' budget-efficient candidates.';render();d.querySelector('.analysis-scroll').scrollTop=0;}catch(err){status.textContent='Unable to generate: '+err.message;}finally{busy=false;b.disabled=false;b.textContent='Generate smart team';}return;}
   if(b.dataset.planApply!==undefined&&result&&appliedConfig){if(running||starting||bench)return;const side=Number(b.dataset.planApply);if(!confirm('Replace '+title(side)+' with the generated '+result.team.length+' Pokémon?'+(config.mode!==appliedConfig.mode?' The match ruleset will also change.':'')))return;
    const roster=result.team.map(x=>({...member(x.id),...x.build,tms:x.build.tms.map(t=>({...t}))}));config.teams[side]=Array.from({length:6},(_,i)=>roster[i]||null);config.mode=appliedConfig.mode;config.tactics[side]=appliedConfig.tactic;$('rules').value=config.mode;persist();d.close();clearBattle();return;}
  });
