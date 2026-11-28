@@ -86,7 +86,7 @@ const rankPriorities={
  hp:['id','dt','sd','ag'],atk:['sd','ag','fe','id'],firstHit:['sd','ag','fe','id'],
  def:['id','dt','sd','ag'],crit:['fe','sd','ag','id'],dodge:['dt','id','sd','ag']
 };
-function rankTms(sp,q,lv){
+function rankTms(sp,q,lv,priority=rankPriorities[q.metric]||rankPriorities.evadeBulk){
  const innate=GD.innateOf(sp.id),learn=new Set(GD.learnOf(sp.id)),slots=lv>=12?2:1;
  const raw=[q.tm1??'auto',q.tm2??'auto'],ranks=[Number(q.tm1rank)||3,Number(q.tm2rank)||3],used=new Set([innate]);
  const out=[null,null];
@@ -94,7 +94,7 @@ function rankTms(sp,q,lv){
  for(let i=0;i<slots;i++){const k=raw[i];if(!k||k==='auto')continue;if(used.has(k)||!learn.has(k))return null;used.add(k);out[i]={k,lv:Math.max(1,Math.min(3,ranks[i]))};}
  // Auto ranks are fixed to the requested rank; assign the strongest available rank to the primary skill.
  const free=Array.from({length:slots},(_,i)=>i).filter(i=>raw[i]==='auto').sort((a,b)=>ranks[b]-ranks[a]||a-b);
- for(const i of free){const k=(rankPriorities[q.metric]||rankPriorities.evadeBulk).find(k=>learn.has(k)&&!used.has(k));if(k){out[i]={k,lv:Math.max(1,Math.min(3,ranks[i]))};used.add(k);}}
+ for(const i of free){const k=priority.find(k=>learn.has(k)&&!used.has(k));if(k){out[i]={k,lv:Math.max(1,Math.min(3,ranks[i]))};used.add(k);}}
  // Preserve empty first slots in the editable build, but exclude them from native skill inputs.
  return out.map(t=>t||{k:'',lv:1});
 }
@@ -133,10 +133,11 @@ function dexRank(q) {
  for(const sp of Object.values(GD.SPECIES)){
   if(q.rarity&&GD.RAR[sp.rar].n!==q.rarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.innate&&GD.innateOf(sp.id)!==q.innate||q.abilityName&&sp.abN!==q.abilityName)continue;
   const tms=rankTms(sp,q,lv);if(!tms){skipped.incompatible++;continue;}
+  const variants=[tms];if(metric==='evadeBulk'){const alt=rankTms(sp,q,lv,['dt','id','sd','ag']);if(alt&&JSON.stringify(alt)!==JSON.stringify(tms))variants.push(alt);}
   const items=rankItemChoices(q,sp);if(!items.length){skipped.inactive++;continue;}
   const forms=[0,...(GD.MEGA_SP[sp.id]?[1]:[]),...(GD.MEGA_SP2[sp.id]?[2]:[])].filter(f=>q.forms==='mega'?f>0:q.forms==='all'?true:f===0);
   let best=null;
-  for(const form of forms)for(const item of items){const row=rankOne(q,sp,form,item,tms);evaluated++;if(better(row,best))best=row;}
+  for(const form of forms)for(const item of items)for(const tms of variants){const row=rankOne(q,sp,form,item,tms);evaluated++;if(better(row,best))best=row;}
   if(best)candidates.push(best);
  }
  return {rows:candidates,skipped,evaluated,metric};
