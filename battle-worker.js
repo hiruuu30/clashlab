@@ -197,7 +197,8 @@ function counterExchange(a,b){
  return {ratio,out:Math.max(...a.types.map(t=>GD.eff(t,b.types))),incoming:Math.max(...b.types.map(t=>GD.eff(t,a.types))),specialOut:a.combat?.specialType?GD.eff(a.combat.specialType,b.types):Math.max(...a.types.map(t=>GD.eff(t,b.types))),specialIn:b.combat?.specialType?GD.eff(b.combat.specialType,a.types):Math.max(...b.types.map(t=>GD.eff(t,a.types)))};
 }
 function counterReport(team,foes){
- return foes.map((f,i)=>{const ranked=team.map(r=>({id:r.id,name:r.name,...counterExchange(r,f)})).sort((a,b)=>b.ratio-a.ratio||a.name.localeCompare(b.name));return {id:f.id,name:f.name,slot:f.slot,types:f.types,item:f.itemName,tms:f.tmNames,effective:f.effective,form:f.form,best:ranked[0]||null,backup:ranked[1]||null};});
+ const projected=team.map(r=>({...r,teamBoost:1+([0,0,0,.05,.08,.12,.15][team.filter(x=>x.types.includes(r.types[0])).length]||0)}));
+ return foes.map((f,i)=>{const ranked=projected.map(r=>({id:r.id,name:r.name,...counterExchange(r,f)})).sort((a,b)=>b.ratio-a.ratio||a.name.localeCompare(b.name));return {id:f.id,name:f.name,slot:f.slot,types:f.types,item:f.itemName,tms:f.tmNames,effective:f.effective,form:f.form,best:ranked[0]||null,backup:ranked[1]||null};});
 }
 function teamPlan(q,progress=()=>{}){
  const {core,modes}=runtime,C=core.CFG;
