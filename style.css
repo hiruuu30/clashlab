@@ -1247,3 +1247,34 @@ body:not(.match-view) .team-list{grid-row:4}
 
 /* Optimizer recommendations */
 .cx-rank-name .cx-opt-item{color:#ffdc78;font-weight:600}.cx-rank-row{min-height:68px}.cx-rank-primary select{appearance:none;-webkit-appearance:none;border-radius:0;padding:3px 6px;font-size:16px}.cx-rank-row .cx-rank-name small{line-height:1.05}.cx-rank-launch{font-weight:600}
+
+/* Smart Team Builder — compact budget planner */
+.stb-dialog{height:min(840px,calc(100dvh - 20px))}
+.stb-options{border:1px solid #46527e;padding:5px 7px;color:var(--dim);font-size:16px}
+.stb-options summary{cursor:pointer}
+.stb-options .form-grid{margin-top:7px}
+.stb-checks{display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:6px}
+.stb-status{font-size:14px;color:var(--dim);line-height:1.15;margin:0}
+.stb-total{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.stb-total>div{display:grid;gap:3px;border:1px solid #46527e;background:#141a30;padding:6px 8px}
+.stb-total small{color:var(--dim);font-size:14px}
+.stb-total strong{color:var(--yellow);font:22px/1.1 var(--number);overflow-wrap:anywhere}
+.stb-notice{font-size:16px;color:#f4d67d;margin:3px 0}
+.stb-member{border:1px solid #46527e;background:#252c46;padding:6px;display:grid;gap:5px;min-width:0}
+.stb-member-head{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:6px;align-items:center}
+.stb-member-head img{width:38px;height:38px;object-fit:contain}
+.stb-member-head>div{display:grid;gap:3px;min-width:0}
+.stb-member-head strong{font-size:20px;line-height:1.05;overflow-wrap:anywhere}
+.stb-member-head small{font-size:14px;color:var(--dim)}
+.stb-member-head>b{font-size:18px;color:var(--yellow);text-align:right}
+.stb-loadout{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.stb-loadout span{font-size:14px;color:var(--dim);padding:4px;background:#151a30;overflow-wrap:anywhere}
+.stb-loadout b{display:block;font-size:16px;color:#e2e9fd}
+.stb-statline{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:15px;color:#bcd2f7}
+.stb-member details,.stb-coverage{font-size:15px;color:var(--dim);padding-top:4px;border-top:1px solid #46527e}
+.stb-member summary,.stb-coverage summary{cursor:pointer}
+.stb-cost{display:grid;grid-template-columns:1fr auto;gap:3px;margin-top:5px}
+.stb-member details p,.stb-coverage p{margin-top:4px;line-height:1.2}
+.stb-apply{display:grid;grid-template-columns:1fr 1fr;gap:6px;position:sticky;bottom:0;background:#171c32;padding:5px 0}
+.stb-apply button{min-height:40px;font-size:16px}
+@media(max-width:760px){.stb-dialog{height:calc(100dvh - 12px)}.stb-dialog .analysis-controls{max-height:54dvh}.stb-member-head{grid-template-columns:32px minmax(0,1fr) auto}.stb-member-head img{width:32px;height:32px}.stb-member-head strong{font-size:18px}.stb-member-head>b{font-size:16px}.stb-total strong{font-size:20px}.stb-member{padding:5px}.stb-loadout b{font-size:15px}}
