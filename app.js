@@ -311,7 +311,7 @@ function ensureTeams() {
 const dexPending=new Map();let dexJob=0;
 function requestDex(type,payload){return new Promise((resolve,reject)=>{if(!workers||!catalog){reject(Error('Engine unavailable'));return;}const job=++dexJob;const timer=setTimeout(()=>{dexPending.delete(job);reject(Error('Engine request timed out'));},15000);dexPending.set(job,{resolve,reject,timer});workers.postMessage({type,job,...payload});});}
 function handle(message) {
-  if(message.type==='dex-preview'||message.type==='dex-timing'){const p=dexPending.get(message.job);if(p){clearTimeout(p.timer);dexPending.delete(message.job);if(message.error)p.reject(Error(message.error));else p.resolve(message.result);}return;}
+  if(message.type==='dex-preview'||message.type==='dex-timing'||message.type==='dex-rank'){const p=dexPending.get(message.job);if(p){clearTimeout(p.timer);dexPending.delete(message.job);if(message.error)p.reject(Error(message.error));else p.resolve(message.result);}return;}
   if(message.type==='ready'){
     catalog=message;refTypes=Object.keys(message.typeMatrix||{});species=Object.fromEntries(message.species.map(x=>[x.id,x]));items=Object.fromEntries(message.items.map(x=>[x.k,x]));
     for(let i=0;i<2;i++)for(let j=0;j<presets[i].length;j++)if(!species[presets[i][j]])presets[i][j]=message.species[(i*6+j)%message.species.length].id;
