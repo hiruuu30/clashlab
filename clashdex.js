@@ -98,7 +98,7 @@ export function mountDex(api){
   if(!byKey.has(key))return;
   selected=key;view='profile';
   if(move)d.classList.add('cx-detail-open');
-  renderProfile();all('[data-pokemon]').forEach(b=>{const active=b.dataset.pokemon===key;b.setAttribute('aria-current',String(active));b.closest('.cx-row').classList.toggle('cx-selected',active)});
+  renderProfile();all('[data-pokemon]').forEach(b=>{const active=b.dataset.pokemon===key;b.setAttribute('aria-current',String(active));b.closest('.cx-row')?.classList.toggle('cx-selected',active)});
   if(move)$('[data-profile]').scrollIntoView({block:'nearest'});
   api.requestPortraits();
  }
@@ -134,7 +134,7 @@ export function mountDex(api){
   const base=bySpecies.get(p.speciesId), forms=[base,...(base.megaForms||[]).map(m=>byKey.get(base.id+':'+m.form)).filter(Boolean)];
   const speeds=entries.filter(e=>!e.form),rank=1+speeds.filter(e=>e.spd>base.spd).length;
   const abilities=(p.abilityEffects||[]).map((v,i)=>'<div><b>Rank '+['I','II','III'][i]+'</b><span>'+esc(v)+'</span></div>').join('');
-  const moves=(p.form?p.formMoves:p.moves)||p.moves||[];
+  const moves=p.moves||[];
   const itemRows=c.items.map(it=>({it,bonus:num(p.levels?.[it.k]),active:!!p.activeEffects?.[it.k]})).filter(x=>x.bonus>0||x.active).sort((a,b)=>b.bonus-a.bonus||Number(b.active)-Number(a.active)).slice(0,8);
   const pinned=pins.includes(p.key);
   $('[data-profile]').innerHTML=`<div class="cx-profile-nav"><button class="quiet cx-back" data-back>← Browse</button><button class="quiet" data-prev aria-label="Previous Pokémon">←</button><button class="quiet" data-next aria-label="Next Pokémon">→</button><button class="quiet" data-pin aria-pressed="${pinned}">${pinned?'✓ Pinned':'＋ Compare'}</button><button class="quiet" data-favorite="${esc(p.key)}" aria-label="Toggle favorite" aria-pressed="${favorites.has(p.key)}">${favorites.has(p.key)?'★':'☆'}</button></div>
@@ -188,6 +188,6 @@ export function mountDex(api){
   c=api.getCatalog();if(!c)return;
   entries=entriesFor(c);byKey=new Map(entries.map(p=>[p.key,p]));bySpecies=new Map(c.species.map(p=>[p.id,{...p,key:p.id+':0',speciesId:p.id,form:0}]));
   pins=pins.filter(k=>byKey.has(k));favorites=readFavorites();initFilters();d.classList.remove('cx-detail-open');view='profile';limit=30;
-  if(!d.open)d.showModal();renderList();if(!selected||!byKey.has(selected))selected=rows[0]?.key||null;renderProfile();api.requestPortraits();
+  if(!d.open)d.showModal();if(!selected||!byKey.has(selected))selected=filterDex(c,entries,f,favorites)[0]?.key||null;renderList();renderProfile();api.requestPortraits();
  }};
 }
