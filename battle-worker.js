@@ -311,6 +311,127 @@ function teamPlan(q,progress=()=>{}){
  if(cheapest.length>deepest[0].team.length||cheapest.length===deepest[0].team.length&&evaluate(cheapest)>deepest[0].value)deepest.unshift({team:cheapest,cost:cheapest.reduce((n,x)=>n+x.cost,0),sol:0,candy:cheapest.reduce((n,x)=>n+x.candy,0),value:evaluate(cheapest)});
  const best=deepest[0],alternatives=[];for(const state of deepest){if(alternatives.length>=3)break;const sig=state.team.map(x=>x.id).sort().join('|');if(alternatives.some(a=>a.signature===sig))continue;alternatives.push({signature:sig,team:state.team.slice().sort((a,b)=>b.score-a.score),cost:state.cost,sol:state.sol,candy:state.candy,score:state.value});}return {alternatives,team:best.team.sort((a,b)=>b.score-a.score||a.expectedCooldown-b.expectedCooldown),cost:best.cost,sol:best.sol,score:best.value,complete:best.team.length===size,size,budget,evaluated,candidates:candidates.length,shortlist:pool.length,coverage:types.filter(t=>best.team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))),weak:types.filter(t=>best.team.some(r=>GD.eff(t,r.types)>1)&&!best.team.some(r=>GD.eff(t,r.types)<1)),candy:best.candy,candyBudget:Number.isFinite(candyBudget)?candyBudget:null,trainingCandy:best.team.reduce((n,r)=>n+r.acquisition.training,0),abilityCandy:best.team.length*abilityCandy,trainingXP:best.team.reduce((n,r)=>n+r.acquisition.xp,0),tmPricing:q.tmPricing==='manual'?'manual':'expected',tmUnitCosts:Object.fromEntries(Object.keys(GD.SKILL_R).map(k=>[k,tmPrice(k)])),tmReserve,priceFactor:mult,megaCost:q.megaCost,mode:mode.name,stone:C.shop.stone,tmCase:C.shop.tm,megaAttempt:C.mega.price,megaSOL:C.mega.sol};
 }
+
+/* Explainable, read-only roster coach. Scores are rubric scores, never win probabilities. */
+function teamRate(q){
+ const {core,modes}=runtime,mode=modes.find(m=>m.id===q.mode)||modes[0],all=Object.values(GD.SPECIES),types=Object.keys(GD.TYPES);
+ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),integer=(v,a,b)=>clamp(Math.trunc(Number(v)||a),a,b);
+ const round=(n,p=0)=>Number(n.toFixed(p)),raw=Array.isArray(q.team)?q.team.slice(0,6):[],other=Array.isArray(q.opponent)?q.opponent.slice(0,6):[];
+ const normalizeTactic=k=>Object.hasOwn(GD.TACTICS,k)?k:'equilibrado',tactic=normalizeTactic(q.tactic),opponentTactic=normalizeTactic(q.opponentTactic);
+ const issues=[],strengths=[],suggestions=[],rows=[],ids=new Set();let usedMega=false,megaCount=0;
+ const issue=(severity,title,detail,slot=null)=>issues.push({severity,title,detail,slot});
+ function clean(m,slot,report){
+  if(!m||!GD.SPECIES[m.id])return null;
+  const sp=GD.SPECIES[m.id],lv=integer(m.lv,1,50),ability=integer(m.ability,1,3),item=m.item!==''&&core.CFG.items[Number(m.item)]?String(Number(m.item)):'',form=Number(m.mega)===2&&GD.MEGA_SP2[m.id]?2:Number(m.mega)>=1&&GD.MEGA_SP[m.id]?1:0;
+  const seen=new Set([GD.innateOf(m.id)]),tms=[0,1].map(i=>{const t=m.tms?.[i];if(!t?.k)return {k:'',lv:1};if((i===1&&lv<12)||seen.has(t.k)||!GD.learnOf(m.id).includes(t.k)){if(report)issue('high',sp.name+' has an unavailable TM','Slot '+(i+1)+' cannot use '+(skills[t.k]||t.k)+' at this level or duplicates its innate/other TM.',slot);return {k:'',lv:1};}seen.add(t.k);return {k:t.k,lv:integer(t.lv,1,3)};});
+  if(report&&m.item!==''&&m.item!=null&&!core.CFG.items[Number(m.item)])issue('high',sp.name+' has an unknown item','Select a valid held item.',slot);
+  if(report&&Number(m.mega)>0&&!form)issue('high',sp.name+' has an unavailable Mega','Select an available Mega form or disable it.',slot);
+  return {id:m.id,lv,ability,item,tms,mega:form};
+ }
+ const cfg=(m,form,tac=tactic,ot=opponentTactic)=>({id:m.id,lv:m.lv,ability:m.ability,item:m.item,form,mode:mode.id,tactic:tac,opponentTactic:ot,hpPct:100,synergy:1,incoming:'',attackerRange:'melee',incomingKind:'basic',weaknessPolicy:false});
+ function projection(m,slot,form,tac=tactic,ot=opponentTactic){
+  const sp=GD.SPECIES[m.id],v=rankOne(cfg(m,form,tac,ot),sp,form,m.item,m.tms);
+  const combat=v.combat,h= combat.held||{},cycle=Math.max(.1,v.expectedCooldown, (combat.animation?.available?combat.animation.seconds:.5)+(combat.recovery||0));
+  // Neutral target with DEF 120. No critical/dodge randomness, animation fetches or battle simulation.
+  const crit=1+v.crit/100*((combat.critMultiplier||1.5)-1),power=Math.sqrt(combat.basicPower/45);
+  const pressure=v.atk*1.25*.5*power*(h.basic||1)*crit/cycle;
+  const bulk=v.evadeBulk;
+  const role=GD.ROLES[sp.role].n;
+  return {...v,slot,role,cycle,pressure,bulk,configured:m,megaRequested:m.mega,itemName:m.item===''?'None':core.CFG.items[Number(m.item)].n,
+   tmNames:m.tms.filter(t=>t.k).map(t=>(skills[t.k]||t.k)+' '+['I','II','III'][t.lv-1])};
+ }
+ for(let i=0;i<raw.length;i++){
+  const m=clean(raw[i],i,true);if(!m){if(raw[i])issue('high','Unknown Pokémon in slot '+(i+1),'Replace the invalid roster entry.',i);continue;}
+  if(ids.has(m.id)){issue('high','Duplicate species: '+GD.SPECIES[m.id].name,'The roster should contain distinct species.',i);continue;}ids.add(m.id);
+  if(m.mega)megaCount++;const form=m.mega&&!usedMega?m.mega:0;if(form)usedMega=true;
+  rows.push(projection(m,i,form));
+ }
+ if(!rows.length)return {empty:true,mode:mode.name,issues:[{severity:'high',title:'Empty roster',detail:'Add Pokémon to the selected team before rating.'}]};
+ const n=rows.length;
+ if(n<6)issue('high','Only '+n+' of 6 roster slots filled','Complete the roster for standard six-Pokémon battles; fewer members reduce depth.');
+ if(megaCount>1)issue('medium',megaCount+' Mega candidates selected','Only one may Mega Evolve per battle. This rating projects the first selected Mega; the others use their non-Mega forms.');
+ if(usedMega)strengths.push('One Mega form is included as an already-evolved projection.');
+ const out=(r,target)=>Math.max(...r.types.map(t=>GD.eff(t,target)));
+ const incoming=(r,attacks)=>Math.max(...attacks.map(t=>GD.eff(t,r.types)));
+ const targetTable=types.map(t=>({type:t,hit:rows.filter(r=>out(r,[t])>1).length,weak:rows.filter(r=>GD.eff(t,r.types)>1).length,resist:rows.filter(r=>GD.eff(t,r.types)<1).length,worst:Math.max(...rows.map(r=>GD.eff(t,r.types))),weakSlots:rows.filter(r=>GD.eff(t,r.types)>1).map(r=>r.slot),resistSlots:rows.filter(r=>GD.eff(t,r.types)<1).map(r=>r.slot)}));
+ const uncovered=targetTable.filter(x=>x.weak>0&&!x.resist),shared=targetTable.filter(x=>x.weak>=2&&x.weak>x.resist),gaps=targetTable.filter(x=>!x.hit),covered=types.length-gaps.length;
+ const tname=t=>GD.TYPES[t]?.n||t,joinTypes=a=>a.map(x=>tname(x.type)).join(', ');
+ if(uncovered.length)issue('high','Uncovered weaknesses: '+joinTypes(uncovered),'At least one member is weak to each listed type and no member resists it by defensive typing. Held-item immunities and temporary effects are excluded from this table.');
+ if(shared.length)issue('medium','Shared weakness pressure','Multiple members are weak to '+joinTypes(shared)+' with fewer resistant switch-ins.');
+ if(gaps.length)issue('medium','Offensive coverage gaps','No native basic attack is super effective against single-type '+joinTypes(gaps)+'. Neutral attacks may still be strong.');
+ if(covered>=12)strengths.push('Strong native single-type coverage: '+covered+'/'+types.length+' types.');
+ if(!uncovered.length)strengths.push('Every represented type weakness has at least one resistant teammate.');
+ const ranged=rows.filter(r=>r.ranged).length,defenders=rows.filter(r=>['Defender','Bulky'].includes(r.role)).length,speedsters=rows.filter(r=>r.role==='Speedster').length;
+ if(n>=3&&(ranged===0||ranged===n))issue('medium',ranged?'All ranged roster':'All melee roster','One attack range is not inherently bad, but leaves fewer positioning options. Compare a mixed-range alternative.');
+ else if(ranged>0&&ranged<n)strengths.push('Mixed melee and ranged options ('+(n-ranged)+' / '+ranged+').');
+ if(n>=3&&!defenders)issue('info','No native Defender or Bulky role','A strong defensive build can compensate; inspect the actual bulk scores before adding a tank.');
+ if(defenders)strengths.push(defenders+' native Defender/Bulky role'+(defenders===1?'':'s')+'.');
+ for(const r of rows){
+  r.synergyCount=rows.filter(x=>x.types.includes(r.types[0])).length;r.synergy=1+([0,0,0,.05,.08,.12,.15][r.synergyCount]||0);
+  r.pressure*=r.synergy;
+  if(r.configured.item!==''&&!r.active){const it={k:Number(r.configured.item),r:core.CFG.items[Number(r.configured.item)].r};issue(core.heldDef(it)?'medium':'info',r.name+' has no active held-item combat effect',r.itemName+' may still grant effective levels; compare a compatible combat item.',r.slot);}
+  if(r.configured.item==='')issue('info',r.name+' has no held item','A compatible held item may improve its effective level or combat performance.',r.slot);
+  const legal=GD.learnOf(r.id).filter(k=>k!==r.innate),used=r.configured.tms.filter(t=>t.k).length,slots=r.configured.lv>=12?2:1;
+  r.openTM=Math.min(slots,legal.length)-used;
+  if(r.openTM>0)issue('info',r.name+' has '+r.openTM+' unused TM slot'+(r.openTM===1?'':'s'),'Compatible skills can improve the build; use the suggested loadout below.',r.slot);
+ }
+ if(rows.some(r=>r.synergy>1))strengths.push('Native same-primary-type damage bonus up to '+round((Math.max(...rows.map(r=>r.synergy))-1)*100)+'% in the projected forms.');
+ // A transparent reference: no-item, innate-only Pokémon of the same rarity at the member's base level/rank/ruleset/tactic.
+ // Cache by rarity and level to avoid repeated catalog scans. Compare against non-Mega peers (not top meta teams).
+ const refs=new Map();
+ function reference(r){
+  const m=r.configured,key=[GD.SPECIES[r.id].rar,m.lv,m.ability].join(':');if(refs.has(key))return refs.get(key);
+  const list=all.filter(p=>p.rar===GD.SPECIES[r.id].rar).map(p=>projection({...m,id:p.id,item:'',tms:[{k:'',lv:1},{k:'',lv:1}],mega:0},-1,0));
+  const median=k=>{const a=list.map(x=>x[k]).sort((a,b)=>a-b);return a[Math.floor(a.length/2)]||1;},ref={pressure:median('pressure'),bulk:median('bulk'),count:list.length};refs.set(key,ref);return ref;
+ }
+ const blendScore=(a,b)=>clamp(50+35*Math.log2(Math.max(.01,a/b)),0,100);
+ for(const r of rows){const ref=reference(r);r.ref=ref;r.attackGrade=blendScore(r.pressure,ref.pressure);r.bulkGrade=blendScore(r.bulk,ref.bulk);r.memberGrade=round(.55*r.attackGrade+.45*r.bulkGrade);}
+ const avg=k=>rows.reduce((s,r)=>s+r[k],0)/n;
+ const grades={offense:round(.55*avg('attackGrade')+.45*100*covered/types.length),defense:round(.65*avg('bulkGrade')+.35*100*(1-uncovered.length/types.length)),coverage:round(100*covered/types.length),balance:round(clamp(100-60*uncovered.length/types.length-40*shared.length/types.length-(n>=3&&(ranged===0||ranged===n)?12:0),0,100)),
+ loadout:round(100*rows.reduce((sum,r)=>sum+(.55*(r.active?1:r.configured.item!==''?.5:0)+.45*(r.openTM<=0?1:1-r.openTM/(r.configured.lv>=12?2:1))),0)/n),depth:round(100*n/6)};
+ const score=round(.23*grades.offense+.23*grades.defense+.18*grades.coverage+.14*grades.balance+.12*grades.loadout+.10*grades.depth);
+ // Build coach: test legal item candidates and objective-relevant skills. Preserve the user's level, ability and projected Mega.
+ function utility(r,purpose){const ref=r.ref||{pressure:1,bulk:1};return purpose==='tank'?Math.log(Math.max(1e-9,r.bulk/ref.bulk))*.75+Math.log(Math.max(1e-9,r.pressure/ref.pressure))*.25:Math.log(Math.max(1e-9,r.pressure/ref.pressure))*.7+Math.log(Math.max(1e-9,r.bulk/ref.bulk))*.3;}
+ for(const r of rows){
+  const m=r.configured,sp=GD.SPECIES[r.id],purpose=['Defender','Bulky'].includes(r.role)?'tank':'attack';
+  const q1={...cfg(m,r.form),metric:purpose==='tank'?'evadeBulk':'expectedCooldown',tm1:'auto',tm2:'auto',tm1rank:m.ability,tm2rank:m.ability};
+  const recommended=rankTms(sp,q1,m.lv)||m.tms,alternates=[m.tms,recommended];
+  const alt=rankTms(sp,{...q1,metric:purpose==='tank'?'def':'atk'},m.lv);if(alt)alternates.push(alt);
+  const items=rankItemChoices({...q1,item:'auto'},sp),before={...r,pressure:r.pressure/r.synergy},baseScore=utility(before,purpose);
+  let best=before,bestScore=baseScore;
+  for(const item of items)for(const tms of alternates){const v=projection({...m,item,tms},r.slot,r.form);v.ref=r.ref;const value=utility(v,purpose);if(value>bestScore+1e-8){best=v;bestScore=value;}}
+  if(bestScore>baseScore+Math.log(1.04)){
+   suggestions.push({kind:'build',slot:r.slot,name:r.name,title:'Optimize '+r.name+' for '+purpose,
+    detail:'Tested compatible held items and a small set of role-relevant TM combinations at the current level/rank. Neutral pressure '+round(before.pressure,1)+' → '+round(best.pressure,1)+'; passive bulk '+round(before.bulk)+' → '+round(best.bulk)+'.',
+    item:best.itemName,tms:best.tmNames,build:best.configured,gain:round((Math.exp(bestScore-baseScore)-1)*100,1)});
+  }
+ }
+ // Candidate replacement coach: identify actual gaps and rank a same-or-lower rarity shortlist by marginal typing improvement.
+ const priority=targetTable.filter(x=>!x.hit||x.weak>x.resist);
+ if(priority.length){
+  const pick=rows.slice().sort((a,b)=>a.memberGrade-b.memberGrade)[0],sp=GD.SPECIES[pick.id],candidates=[];
+  function teamTypingScore(list){let value=0;for(const t of types){const hit=list.some(r=>out(r,[t])>1),weak=list.filter(r=>GD.eff(t,r.types)>1).length,resist=list.filter(r=>GD.eff(t,r.types)<1).length;value+=hit?1:0;value-=weak&&!resist?1.3:0;value-=Math.max(0,weak-resist-1)*.35;}return value;}
+  const before=teamTypingScore(rows),remaining=rows.filter(r=>r.slot!==pick.slot);
+  for(const p of all){if(ids.has(p.id)||p.rar>sp.rar)continue;const v=projection({...pick.configured,id:p.id,item:'',mega:0,tms:[{k:'',lv:1},{k:'',lv:1}]},pick.slot,0);const improvement=teamTypingScore([...remaining,v])-before;if(improvement>.1)candidates.push({v,improvement});}
+  candidates.sort((a,b)=>b.improvement-a.improvement||b.v.pressure-a.v.pressure||b.v.bulk-a.v.bulk||a.v.name.localeCompare(b.v.name));
+  for(const {v,improvement} of candidates.slice(0,3))suggestions.push({kind:'replacement',slot:pick.slot,name:v.name,title:'Consider '+v.name+' instead of '+pick.name,detail:'Same or lower rarity, no held item or additional TMs assumed. Improves the type-coverage/switch-in rubric by '+round(improvement,1)+' points; not a guaranteed stronger combatant.',build:v.configured,gain:round(improvement,1)});
+ }
+ // Optional actual opponent: inspect dual-typing and forced special typing separately, not win probability.
+ const foe=[];let foeMega=false;
+ if(q.compare!==false)for(let i=0;i<other.length;i++){const m=clean(other[i],i,false);if(!m)continue;const form=m.mega&&!foeMega?m.mega:0;if(form)foeMega=true;foe.push(projection(m,i,form,opponentTactic,tactic));}
+ const matchups=foe.map(f=>{
+  const counters=rows.map(r=>({slot:r.slot,name:r.name,out:out(r,f.types),in:incoming(r,f.types),special:r.combat.specialType?GD.eff(r.combat.specialType,f.types):out(r,f.types),enemySpecial:f.combat.specialType?GD.eff(f.combat.specialType,r.types):incoming(r,f.types),pressure:r.pressure}));
+  counters.sort((a,b)=>Math.log2(Math.max(a.out,a.special)/Math.max(a.in,a.enemySpecial))-Math.log2(Math.max(b.out,b.special)/Math.max(b.in,b.enemySpecial))||a.pressure-b.pressure);counters.reverse();
+  const best=counters[0],threat=counters.every(x=>Math.max(x.in,x.enemySpecial)>Math.max(x.out,x.special));
+  if(threat)issue('high','Difficult matchup: '+f.name,'Every member has a worse best-type exchange against this opponent. Inspect stats, item effects and actual battle positioning.');
+  return {name:f.name,id:f.id,types:f.types,slot:f.slot,best,threat,counters};
+ });
+ const lead=matchups.length?matchups[0].best:rows.slice().sort((a,b)=>b.memberGrade-a.memberGrade)[0];
+ if(lead)strengths.push('Suggested lead: '+lead.name+(matchups.length?' for the opposing first slot based on type exchange.':' based on the neutral member rubric.'));
+ const severity={high:0,medium:1,info:2};issues.sort((a,b)=>severity[a.severity]-severity[b.severity]);
+ return {empty:false,score,letter:score>=90?'S':score>=80?'A':score>=70?'B':score>=60?'C':score>=45?'D':'E',grades,rows:rows.map(({combat,ref,...r})=>({...r,pressure:round(r.pressure,2),bulk:round(r.bulk),cycle:round(r.cycle,3),attackGrade:round(r.attackGrade),bulkGrade:round(r.bulkGrade),referenceCount:ref.count})),issues,strengths,suggestions,targetTable,matchups,mode:mode.name,n,megaCount,ranged,defenders,speedsters,covered,uncovered:uncovered.length,lead:lead?.slot??null,tactic,opponentTactic,reference:'Median unheld, innate-only non-Mega peers of the same rarity, base level and ability rank, under the selected ruleset and tactics. Scores are an explainable heuristic, not a predicted win rate.'};
+}
+
 function timingFor(id,ranged,load=false){
  const anim=ranged?'Shoot':'Attack';
  if(load&&!loadedTimings.has(id)){try{importScripts(upstream+'sp/'+encodeURIComponent(id)+'.js');if(self.SPRITE_T[id])loadedTimings.add(id);}catch{}}
@@ -353,6 +474,7 @@ function benchmark(config, job) {
 self.onmessage = ({data}) => {
   try {
     if(!runtime) throw Error('The upstream battle engine is unavailable.');
+    if(data.type==='team-rate'){try{send('team-rate',{job:data.job,result:teamRate(data.config)});}catch(e){send('team-rate',{job:data.job,error:e.message});}return;}
     if(data.type==='team-plan'){try{send('team-plan',{job:data.job,result:teamPlan(data.config,p=>send('team-plan-progress',{job:data.job,progress:p}))});}catch(e){send('team-plan',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-rank'){try{send('dex-rank',{job:data.job,result:dexRank(data.config)});}catch(e){send('dex-rank',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-preview'){try{send('dex-preview',{job:data.job,result:dexPreview(data.config)});}catch(e){send('dex-preview',{job:data.job,error:e.message});}return;}
