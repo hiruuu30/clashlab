@@ -68,7 +68,7 @@ function dexPreview(q) {
  const same=integer(q.synergy,1,6),synergy=[0,0,0,.05,.08,.12,.15][same]+1;
  const basicPower=Math.max(20,Math.round(u.sp.atk*.55/5)*5);
  const specialPower=Math.round(basicPower*2.1/10)*10;
- const tags=it?core.heldTags(it):[];
+ const tags=it&&!q.rankFast?core.heldTags(it):[];
  return {effective,bonus,mode:mode.name,form:mega?u.sp.name:sp.name,types:u.types,specialType:hb?.mty||null,
    hp:u.max,currentHP:u.hp,atk:u.atk,def:u.def,spd:u.spd,attack:game.atkOf(u),defense:game.defOf(u),megaMultiplier:u.megaMul||1,
    damageTaken:(hb?.taken||1)*(u.ab==='pele'?1-[.10,.15,.20][abLv-1]:1),rangedDamageTaken:hb?.vsR||1,ranged:u.ranged,
@@ -99,7 +99,7 @@ function rankTms(sp,q,lv,priority=rankPriorities[q.metric]||rankPriorities.evade
  return out.map(t=>t||{k:'',lv:1});
 }
 function rankOne(q,sp,form,item,tms){
- const {core}=runtime,def=core.CFG.items[Number(item)],v=dexPreview({...q,id:sp.id,form,item,tms:tms.filter(t=>t.k)});
+ const {core}=runtime,def=core.CFG.items[Number(item)],v=dexPreview({...q,id:sp.id,form,item,rankFast:true,tms:tms.filter(t=>t.k)});
  const chance=Math.min(1,Math.max(0,(v.held?.qc||0)/100));
  const expectedCooldown=((1-chance)*v.cooldown+chance*.3)/v.speedMul;
  const incoming=q.incoming&&Object.hasOwn(GD.TYPES,q.incoming)?GD.eff(q.incoming,v.types):1;
@@ -115,7 +115,7 @@ function rankItemChoices(q,sp){
  const seen=new Set(),out=[];
  for(const item of indices){
   const d=item===''?null:core.CFG.items[Number(item)],it=d?{k:Number(item),r:d.r}:null,h=core.heldFx(it,sp.id);
-  if(q.activeOnly&&it&&!h)continue;
+  if(q.activeOnly&&(!it||!h))continue;
   const mode=runtime.modes.find(m=>m.id===q.mode)||runtime.modes[0],bonus=core.itemLv(it,sp.id),effective=!mode.cap?q.lv+bonus:mode.kind==='arena'?Math.min(q.lv,mode.cap)+bonus:Math.min(q.lv+bonus,mode.cap);
   const signature=JSON.stringify([effective,!!h,h?.st||null,h?.ty||null,h?.mty||null,h?.spd||1,h?.qc||0,h?.dmg||1,h?.wp||1,h?.taken||1,h?.vsR||1,h?.crit||0,h?.eva||0]);
   if(seen.has(signature))continue;seen.add(signature);out.push(item);
