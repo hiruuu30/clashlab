@@ -1097,3 +1097,104 @@ body:not(.match-view) .team-list{grid-row:4}
  #editor #species{height:35px;min-height:35px;max-height:35px}
  #editor .dialog-actions button{min-height:38px;font-size:17px}
 }
+
+
+/* Fixed Dex browser controls and dense analysis tools. */
+.clashdex-v2 .cx-browser{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0}
+.cx-browser-toolbar{flex:none;min-width:0;padding:10px 14px 0;background:#171c32;border-bottom:1px solid #46527e}
+.cx-results-scroll{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#6875aa #161b30;padding:6px 14px 14px}
+.cx-browser-toolbar .cx-sort-select select{appearance:none;-webkit-appearance:none;border-radius:0;padding-right:20px;background-image:linear-gradient(45deg,transparent 50%,#aab3d8 50%),linear-gradient(135deg,#aab3d8 50%,transparent 50%);background-position:calc(100% - 12px) 50%,calc(100% - 7px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.analysis-dialog{width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:0;overflow:hidden}
+.analysis-dialog[open]{display:flex;flex-direction:column}
+.analysis-dialog>.dialog-head{position:static;flex:none;padding:7px 10px;gap:6px}
+.analysis-dialog>.dialog-head h2{font-size:11px;line-height:1.5}
+.analysis-dialog>.dialog-head .icon-btn{min-width:34px;min-height:34px;padding:0;font-size:22px}
+.analysis-dialog>.editor-fields{display:flex;flex-direction:column;min-height:0;gap:0;padding:0;overflow:hidden}
+.analysis-controls{display:grid;flex:none;gap:6px;padding:8px 10px;background:#1c2038;border-bottom:1px solid #46527e;max-height:45dvh;overflow:auto;overscroll-behavior:contain}
+.analysis-controls .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.analysis-controls label{font-size:16px;line-height:1.15;gap:3px}
+.analysis-dialog .analysis-controls :is(select,input:not([type=checkbox])){min-height:34px;height:34px;font-size:17px;padding:3px 6px;border-radius:0}
+.analysis-dialog .analysis-controls select{appearance:none;-webkit-appearance:none;padding-right:20px;background-image:linear-gradient(45deg,transparent 50%,#aab3d8 50%),linear-gradient(135deg,#aab3d8 50%,transparent 50%);background-position:calc(100% - 12px) 50%,calc(100% - 7px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.analysis-controls label>span{display:flex;align-items:center;gap:5px}
+.analysis-controls input[type=checkbox]{width:16px;height:16px;margin:0;flex:none}
+.analysis-controls>button{min-height:34px;font-size:17px}
+.analysis-note{font-size:15px;color:var(--dim)}
+.analysis-note summary{cursor:pointer;padding:3px 0}
+.analysis-note .hint{font-size:14px;line-height:1.25;margin-top:4px}
+.analysis-scroll{min-height:0;overflow:auto;overscroll-behavior:contain;padding:7px 10px 10px;scrollbar-width:thin;flex:1;font-size:17px}
+.analysis-scroll [data-results],.analysis-scroll [data-list]{display:grid;gap:4px;min-width:0}
+.analysis-scroll .hint{font-size:14px;line-height:1.2}
+.analysis-scroll h2{font-size:10px;margin:5px 0 1px}
+.analysis-scroll p{line-height:1.2}
+.analysis-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:3px 6px;padding:5px 6px;background:#252c46;border:1px solid #46527e;min-height:42px}
+.analysis-rank{color:var(--dim);font-size:15px;text-align:center}
+.analysis-mon{display:flex;align-items:center;gap:6px;min-width:0}
+.analysis-mon img{width:32px;height:32px;flex:none;object-fit:contain}
+.analysis-mon>span{display:grid;min-width:0;gap:2px}
+.analysis-mon strong{font-size:19px;line-height:1.05;overflow-wrap:anywhere}
+.analysis-mon small,.analysis-types{font-size:13px;color:var(--dim);line-height:1.1;overflow-wrap:anywhere}
+.analysis-types{grid-column:2/-1}
+.analysis-match{display:grid;gap:2px;text-align:right;white-space:nowrap}
+.analysis-match b,.analysis-score{color:var(--yellow);font-size:20px}
+.analysis-match small{color:var(--dim);font-size:14px}
+.analysis-overview{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.analysis-overview>div{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:6px 8px;background:#151a30;border:1px solid #46527e}
+.analysis-overview small{font-size:15px;color:var(--dim)}
+.analysis-overview b{font-size:21px;color:var(--yellow)}
+.analysis-uncovered{font-size:15px;color:#ffc2ad;padding:4px 0}
+.analysis-type-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:17px}
+.analysis-type-table th,.analysis-type-table td{padding:5px;border-bottom:1px solid #46527e;text-align:center;font-weight:400}
+.analysis-type-table th:first-child{width:43%;text-align:left}
+.analysis-type-table thead th{color:var(--dim);font-size:15px;background:#151a30}
+.analysis-type-table tbody tr:nth-child(odd){background:#252c46}
+.analysis-type-table summary{cursor:pointer;overflow-wrap:anywhere}
+.analysis-type-table details small{display:block;padding:4px 0;font-size:13px;color:var(--dim)}
+.analysis-danger{color:#ff9385}.analysis-good{color:#4fd18b}
+.analysis-item-row,.analysis-preset-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 6px;background:#252c46;border:1px solid #46527e;min-width:0}
+.analysis-item-row>span{display:grid;gap:2px;min-width:0}
+.analysis-item-row strong,.analysis-preset-row strong{font-size:17px;overflow-wrap:anywhere}
+.analysis-item-row small{color:var(--dim);font-size:14px}
+.analysis-item-row button,.analysis-preset-row button{min-height:34px;padding:3px 7px;font-size:16px;flex:none}
+.analysis-preset-row>span{display:flex;gap:4px;flex:none}
+.analysis-comparison{display:grid;gap:6px}
+.analysis-compare-head,.analysis-compare-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.analysis-compare-head>div,.analysis-compare-details>div{padding:6px;background:#252c46;border:1px solid #46527e;display:grid;gap:4px;min-width:0}
+.analysis-compare-head>div>small,.analysis-compare-details small{font-size:14px;color:var(--dim);overflow-wrap:anywhere}
+.analysis-compare-details details{font-size:15px}
+.analysis-compare-details p{font-size:14px;margin-top:3px;overflow-wrap:anywhere}
+.analysis-compare-stat{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:6px}
+.analysis-compare-stat>b{text-align:center;font-size:21px;color:#a7d9ff}
+.analysis-compare-stat>b:last-child{color:#ffc2ad}
+.analysis-compare-stat>div{text-align:center;color:var(--dim);font-size:14px}
+.analysis-compare-bars{display:grid;gap:2px;background:#111527}
+.analysis-compare-bars i{height:6px;background:#5fa8ff}
+.analysis-compare-bars i+i{background:#ff9385}
+@media(max-width:760px){
+ .clashdex-v2 .cx-browser{padding:0;flex:1}
+ .clashdex-v2.cx-detail-open .cx-browser{display:none}
+ .cx-browser-toolbar{padding:5px 8px 0}
+ .cx-results-scroll{padding:4px 8px max(10px,env(safe-area-inset-bottom))}
+ .clashdex-v2 .cx-head{min-height:38px;padding-block:3px}
+ .clashdex-v2 .cx-head .icon-btn{min-height:34px;min-width:34px}
+ .cx-browser-toolbar .cx-search input,.cx-browser-toolbar .cx-search button{min-height:34px}
+ .cx-browser-toolbar .cx-range-switch button{min-height:32px}
+ .cx-browser-toolbar .cx-compact-sort{margin-bottom:2px}
+ .cx-browser-toolbar .cx-results-head{padding-block:3px}
+ .cx-browser-toolbar .cx-results-head button{min-height:30px}
+ .analysis-dialog{width:calc(100% - 12px);max-height:calc(100dvh - 12px);border-width:2px}
+ .analysis-dialog>.dialog-head{padding:5px 7px}
+ .analysis-controls{padding:6px 7px;gap:4px}
+ .analysis-dialog .analysis-controls :is(select,input:not([type=checkbox])){font-size:16px;height:33px;min-height:33px}
+ .analysis-controls label{font-size:15px}
+ .analysis-scroll{padding:5px 7px 7px}
+ .analysis-row{padding:4px 5px;gap:2px 5px;grid-template-columns:23px minmax(0,1fr) auto;min-height:40px}
+ .analysis-mon img{width:29px;height:29px}
+ .analysis-mon strong{font-size:17px}
+ .analysis-mon small{font-size:12px}
+ .analysis-match b,.analysis-score{font-size:18px}
+ .analysis-type-table th,.analysis-type-table td{padding:4px;font-size:16px}
+ .analysis-item-row button,.analysis-preset-row button{font-size:15px;min-height:32px}
+}
+@media(max-width:350px){.cx-browser-toolbar{padding-inline:5px}.cx-results-scroll{padding-inline:5px}.analysis-mon{gap:4px}.analysis-compare-head .analysis-mon{align-items:flex-start}.analysis-compare-head .analysis-mon img{width:24px;height:24px}.analysis-row{grid-template-columns:20px minmax(0,1fr) auto}}
+/* In short landscape windows retain usable result space. */
+@media(max-height:420px){.cx-browser-toolbar{max-height:62dvh;overflow:auto}.analysis-controls{max-height:40dvh}}
