@@ -143,7 +143,7 @@ function dexRank(q) {
  return {rows:candidates,skipped,evaluated,metric};
 }
 /* Budgeted roster planning. All acquisition costs are planning estimates, not live offers. */
-function teamPlan(q){
+function teamPlan(q,progress=()=>{}){
  const {core,modes}=runtime,C=core.CFG;
  const bounded=(v,lo,hi,def)=>Number.isFinite(Number(v))?Math.min(hi,Math.max(lo,Number(v))):def;
  const budget=Math.floor(bounded(q.budget,0,1e12,500000)),lv=Math.floor(bounded(q.lv,1,50,50)),size=Math.floor(bounded(q.size,1,6,6));
@@ -168,10 +168,11 @@ function teamPlan(q){
   }memo.set(id,best);return best;
  }
  const objective=q.objective||'balanced',goals=objective==='balanced'?['expectedCooldown','evadeBulk','atk','def']:objective==='offense'?['atk','expectedCooldown','crit']:objective==='tank'?['evadeBulk','def','atk']:['expectedCooldown','atk','evadeBulk'];
- const candidates=[];let evaluated=0;
+ const candidates=[];let evaluated=0,scanned=0;
  const scoreRaw=(v)=>{const speed=1/Math.max(.05,v.expectedCooldown),bulk=v.evadeBulk,attack=v.atk*(v.basicMultiplier||1);
   return objective==='offense'?Math.pow(attack,.8)*Math.pow(speed,.55)*Math.pow(bulk,.18):objective==='tank'?Math.pow(bulk,.8)*Math.pow(attack,.25):objective==='speed'?Math.pow(speed,.85)*Math.pow(attack,.4)*Math.pow(bulk,.2):Math.pow(attack,.55)*Math.pow(speed,.3)*Math.pow(bulk,.4);};
  for(const sp of all){
+  if(++scanned%24===0)progress({scanned,total:all.length,evaluated,phase:'builds'});
   if(sp.rar<minRarity||sp.rar>maxRarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.type&&!sp.types.includes(q.type)||q.finalOnly&&(GD.EVO[sp.id]||[]).length)continue;
   const acq=acquire(sp.id);if(acq.pkl>budget)continue;
   const megaChance=(C.mega.ok[sp.rar]||0)/100,attempts=q.megaCost==='attempt'?1:1/Math.max(.01,megaChance);
@@ -218,6 +219,7 @@ function teamPlan(q){
  const pool=[...shortlist.values()];
  let beam=[{team:[],cost:0,sol:0,mega:0,value:0}],deepest=beam;
  for(let depth=0;depth<size;depth++){
+  progress({scanned:all.length,total:all.length,evaluated,phase:'roster',depth,size});
   const buckets=new Map(),seen=new Set();
   for(const state of beam)for(const r of pool){if(state.cost+r.cost>budget||state.sol+r.sol>solBudget+1e-9||state.mega+Boolean(r.form)>maxMega||state.team.some(x=>x.id===r.id))continue;
    const team=[...state.team,r],cost=state.cost+r.cost,sol=state.sol+r.sol,mega=state.mega+Number(!!r.form),sig=team.map(x=>x.id+':'+x.form+':'+x.cost+':'+x.score).sort().join('|');if(seen.has(sig))continue;seen.add(sig);
@@ -270,7 +272,7 @@ function benchmark(config, job) {
 self.onmessage = ({data}) => {
   try {
     if(!runtime) throw Error('The upstream battle engine is unavailable.');
-    if(data.type==='team-plan'){try{send('team-plan',{job:data.job,result:teamPlan(data.config)});}catch(e){send('team-plan',{job:data.job,error:e.message});}return;}
+    if(data.type==='team-plan'){try{send('team-plan',{job:data.job,result:teamPlan(data.config,p=>send('team-plan-progress',{job:data.job,progress:p}))});}catch(e){send('team-plan',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-rank'){try{send('dex-rank',{job:data.job,result:dexRank(data.config)});}catch(e){send('dex-rank',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-preview'){try{send('dex-preview',{job:data.job,result:dexPreview(data.config)});}catch(e){send('dex-preview',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-timing'){const id=String(data.id);if(!GD.SPECIES[id])return;send('dex-timing',{job:data.job,result:timingFor(id,GD.ROLES[GD.SPECIES[id].role].ranged,true)});return;}
