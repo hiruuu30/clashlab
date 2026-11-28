@@ -1349,3 +1349,25 @@ body:not(.match-view) .team-list{grid-row:4}
  .tr-issue,.tr-recommend,.tr-member{padding:5px 6px}
  .tr-issue>strong,.tr-recommend>strong{font-size:16px}
 }
+
+/* Counter Team Builder — shared budget planner, compact opponent preview and matchup matrix */
+.ct-target-select,.ct-target-preview{grid-column:1/-1;min-width:0}
+.ct-target-preview{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:4px 6px;background:#151a30;border:1px solid #46527e;font-size:15px}
+.ct-target-preview>span{color:var(--dim);min-width:0}
+.ct-target-preview>div{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end}
+.ct-target-mon{display:grid;place-items:center;width:28px;height:28px}
+.ct-target-mon img{width:28px;height:28px;object-fit:contain}
+.ct-report{display:grid;gap:5px;margin-top:5px}
+.ct-report h3{font-size:11px;line-height:1.5;color:var(--yellow)}
+.ct-match{display:grid;gap:4px;padding:6px;background:#252c46;border:1px solid #46527e;min-width:0}
+.ct-foe{display:grid;grid-template-columns:30px minmax(0,1fr);gap:5px;align-items:center}
+.ct-foe img{width:30px;height:30px;object-fit:contain}
+.ct-foe>div{display:grid;gap:3px;min-width:0}
+.ct-foe strong{font-size:18px;line-height:1.1;overflow-wrap:anywhere}
+.ct-match small{font-size:14px;line-height:1.2;color:var(--dim);overflow-wrap:anywhere}
+.ct-match-result{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:15px}
+.ct-match-result>b{color:var(--yellow)}
+.ct-match-result>span:last-child{margin-left:auto}
+.ct-match small.analysis-danger{color:#ff9385}
+.stb-apply .ct-apply{grid-column:1/-1}
+@media(max-width:350px){.ct-target-preview{flex-wrap:wrap}.ct-target-preview>div{justify-content:flex-start}.ct-target-mon,.ct-target-mon img{width:25px;height:25px}}
