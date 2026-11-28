@@ -107,7 +107,7 @@ function rankOne(q,sp,form,item,tms){
  const bulk=v.currentHP*(120+v.defense)/120/Math.max(.0001,taken*incoming),evadeBulk=bulk/Math.max(.0001,1-dodge);
  const forced=item!==''&&Object.entries(self.FORMS?.[sp.id]||{}).some(([key])=>key===def?.k);
  const key=form?sp.id+':'+form:forced&&v.heldActive?sp.id+':held:'+item:sp.id+':0';
- return {key,id:sp.id,form,name:v.form,types:v.types,ranged:v.ranged,ability:sp.abN,innate:GD.innateOf(sp.id),rarity:GD.RAR[sp.rar].n,effective:v.effective,bonus:v.bonus,hp:v.hp,currentHP:v.currentHP,atk:v.attack,def:v.defense,spd:v.spd,cooldown:v.cooldownAdjusted,expectedCooldown,bulk,evadeBulk,crit:v.crit*100,dodge:dodge*100,firstHit:v.firstHitAttack,active:v.heldActive,protect:v.skills.find(t=>t.k==='pr')?.lv||0,recover:v.skills.find(t=>t.k==='rc')?.lv||0,balloon:!!(v.held?.ball&&q.incoming==='terra'),build:{item,tms,form}};
+ return {key,id:sp.id,form,name:v.form,types:v.types,ranged:v.ranged,ability:sp.abN,innate:GD.innateOf(sp.id),rarity:GD.RAR[sp.rar].n,effective:v.effective,bonus:v.bonus,hp:v.hp,currentHP:v.currentHP,atk:v.attack,def:v.defense,spd:v.spd,cooldown:v.cooldownAdjusted,expectedCooldown,bulk,evadeBulk,crit:v.crit*100,dodge:dodge*100,firstHit:v.firstHitAttack,basicMultiplier:(v.held?.basic||1)*Math.max(1,...v.types.map(t=>v.held?.tdm?.[t]||1)),active:v.heldActive,protect:v.skills.find(t=>t.k==='pr')?.lv||0,recover:v.skills.find(t=>t.k==='rc')?.lv||0,balloon:!!(v.held?.ball&&q.incoming==='terra'),build:{item,tms,form}};
 }
 function rankItemChoices(q,sp){
  const {core}=runtime,indices=q.item==='auto'?['',...core.CFG.items.map((_,i)=>String(i))]:[q.item??''];
@@ -160,7 +160,7 @@ function teamPlan(q){
   if(q.evolution!=='direct'&&!seen.has(id)){
    const prev=GD.PRE[id],p=GD.SPECIES[prev],edge=(GD.EVO[prev]||[]).find(e=>e.to===id);
    if(p&&edge){const base=acquire(prev,new Set([...seen,id])),stone=C.stones.find(x=>x.n===edge.how),trade=edge.how==='Trade',needed=edge.lv||(edge.how==='Friendship'?15:30),variants=[];
-    if(stone||trade){const name=stone?.n||'Linking Cord';variants.push({cost:C.shop.stone,note:name+' (geode allowance; exact stone not guaranteed)',item:name});}
+    if(stone||trade){const target=stone||C.stones.find(x=>x.k==='link'),name=target?.n||'Linking Cord',cost=target?Math.ceil(C.shop.stone*C.stones.reduce((n,x)=>n+x.w,0)/target.w):C.shop.stone;variants.push({cost,note:name+' (expected geode cost; random outcome)',item:name});}
     else if(lv>=needed)variants.push({cost:0,note:'Evolve at Lv '+needed});
     const k=core.evoItem(prev,id),ik=C.items.findIndex(x=>x.k===k);if(ik>=0)variants.push({cost:itemCost(String(ik)),note:'Consume '+C.items[ik].n,item:C.items[ik].n});
     for(const v of variants){const cost=base.pkl+v.cost;if(cost<best.pkl)best={pkl:cost,source:base.source,steps:[...base.steps,v.note+' → '+sp.name],evoItems:[...base.evoItems,...(v.item?[v.item]:[])]};}
@@ -169,7 +169,7 @@ function teamPlan(q){
  }
  const objective=q.objective||'balanced',goals=objective==='balanced'?['expectedCooldown','evadeBulk','atk','def']:objective==='offense'?['atk','expectedCooldown','crit']:objective==='tank'?['evadeBulk','def','atk']:['expectedCooldown','atk','evadeBulk'];
  const candidates=[];let evaluated=0;
- const scoreRaw=(v)=>{const speed=1/Math.max(.05,v.expectedCooldown),bulk=v.evadeBulk,attack=v.atk;
+ const scoreRaw=(v)=>{const speed=1/Math.max(.05,v.expectedCooldown),bulk=v.evadeBulk,attack=v.atk*(v.basicMultiplier||1);
   return objective==='offense'?Math.pow(attack,.8)*Math.pow(speed,.55)*Math.pow(bulk,.18):objective==='tank'?Math.pow(bulk,.8)*Math.pow(attack,.25):objective==='speed'?Math.pow(speed,.85)*Math.pow(attack,.4)*Math.pow(bulk,.2):Math.pow(attack,.55)*Math.pow(speed,.3)*Math.pow(bulk,.4);};
  for(const sp of all){
   if(sp.rar<minRarity||sp.rar>maxRarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.type&&!sp.types.includes(q.type)||q.finalOnly&&(GD.EVO[sp.id]||[]).length)continue;
@@ -201,7 +201,7 @@ function teamPlan(q){
   const groups=new Map();for(const r of options){const k=JSON.stringify([r.form,r.types]);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
   for(const group of groups.values()){group.sort((a,b)=>a.cost-b.cost||b.score-a.score);let best=-Infinity;for(const r of group)if(r.score>best+1e-9){candidates.push(r);best=r.score;}}
  }
- const maxScore=Math.max(1,...candidates.map(r=>r.score)),norm=r=>r.score/maxScore;
+ const maxScore=candidates.reduce((m,r)=>Math.max(m,r.score),1),norm=r=>r.score/maxScore;
  // Beam search: multiple price/score lanes, distinct species, at most one Mega, coverage and shared weaknesses.
  function evaluate(team){
   const covered=types.filter(t=>team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))).length;
@@ -226,7 +226,7 @@ function teamPlan(q){
   }
   beam=[...buckets.values()].flat().sort((a,b)=>b.value-a.value||a.cost-b.cost).slice(0,48);if(!beam.length)break;deepest=beam;
  }
- const best=deepest[0];return {team:best.team.sort((a,b)=>b.expectedCooldown-a.expectedCooldown),cost:best.cost,sol:best.sol,score:best.value,complete:best.team.length===size,size,budget,evaluated,candidates:candidates.length,shortlist:pool.length,coverage:types.filter(t=>best.team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))),weak:types.filter(t=>best.team.some(r=>GD.eff(t,r.types)>1)&&!best.team.some(r=>GD.eff(t,r.types)<1)),candy:best.team.length*C.abCandy*(rank===3?3:rank===2?1:0),tmReserve,priceFactor:mult,megaCost:q.megaCost,mode:mode.name,stone:C.shop.stone,tmCase:C.shop.tm,megaAttempt:C.mega.price,megaSOL:C.mega.sol};
+ const best=deepest[0];return {team:best.team.sort((a,b)=>b.score-a.score||a.expectedCooldown-b.expectedCooldown),cost:best.cost,sol:best.sol,score:best.value,complete:best.team.length===size,size,budget,evaluated,candidates:candidates.length,shortlist:pool.length,coverage:types.filter(t=>best.team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))),weak:types.filter(t=>best.team.some(r=>GD.eff(t,r.types)>1)&&!best.team.some(r=>GD.eff(t,r.types)<1)),candy:best.team.length*C.abCandy*(rank===3?3:rank===2?1:0),tmReserve,priceFactor:mult,megaCost:q.megaCost,mode:mode.name,stone:C.shop.stone,tmCase:C.shop.tm,megaAttempt:C.mega.price,megaSOL:C.mega.sol};
 }
 function timingFor(id,ranged,load=false){
  const anim=ranged?'Shoot':'Attack';
