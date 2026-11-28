@@ -1244,3 +1244,6 @@ body:not(.match-view) .team-list{grid-row:4}
  .cx-result-actions{margin-left:auto}
  .cx-result-actions .cx-rank-launch{font-size:14px;padding-inline:4px}
 }
+
+/* Optimizer recommendations */
+.cx-rank-name .cx-opt-item{color:#ffdc78;font-weight:600}.cx-rank-row{min-height:68px}.cx-rank-primary select{appearance:none;-webkit-appearance:none;border-radius:0;padding:3px 6px;font-size:16px}.cx-rank-row .cx-rank-name small{line-height:1.05}.cx-rank-launch{font-weight:600}
