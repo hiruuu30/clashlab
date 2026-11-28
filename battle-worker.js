@@ -98,8 +98,20 @@ function rankTms(sp,q,lv,priority=rankPriorities[q.metric]||rankPriorities.evade
  // Preserve empty first slots in the editable build, but exclude them from native skill inputs.
  return out.map(t=>t||{k:'',lv:1});
 }
-function rankOne(q,sp,form,item,tms){
- const {core}=runtime,def=core.CFG.items[Number(item)],v=dexPreview({...q,id:sp.id,form,item,rankFast:true,tms:tms.filter(t=>t.k)});
+// For a given native item/form/level projection, added TMs are independent multipliers.
+// This avoids rebuilding the native Battle object for each pair of legal skills.
+function withRankTms(base,tms){
+ const v={...base,skills:[...base.skills,...tms.filter(t=>t.k)]},k=key=>tms.find(t=>t.k===key)?.lv||0;
+ const sd=1+[0,.12,.18,.25][k('sd')],id=1+[0,.12,.18,.25][k('id')];
+ v.attack*=sd;v.firstHitAttack*=sd;v.defense*=id;
+ v.speedMul+=([0,.15,.22,.30][k('ag')])*(v.held?.spd||1);v.cooldownAdjusted=v.cooldown/v.speedMul;
+ v.crit=Math.min(1,v.crit+[0,.06,.10,.15][k('fe')]);
+ v.dodge=Math.min(1,v.dodge+[0,.05,.08,.12][k('dt')]);
+ v.specialDodge=Math.min(1,v.specialDodge+[0,.05,.08,.12][k('dt')]/2);
+ v.specialMultiplier*=1+[0,.2,.3,.4][k('gi')];return v;
+}
+function rankOne(q,sp,form,item,tms,baseline=null){
+ const {core}=runtime,def=core.CFG.items[Number(item)],v=baseline?withRankTms(baseline,tms):dexPreview({...q,id:sp.id,form,item,rankFast:true,tms:tms.filter(t=>t.k)});
  const chance=Math.min(1,Math.max(0,(v.held?.qc||0)/100));
  const expectedCooldown=((1-chance)*v.cooldown+chance*.3)/v.speedMul;
  const incoming=q.incoming&&Object.hasOwn(GD.TYPES,q.incoming)?GD.eff(q.incoming,v.types):1;
@@ -220,10 +232,10 @@ function teamPlan(q,progress=()=>{}){
   const once=v.hp*([0,.25,.35,.45][k('rc')]*.75+(h.berry?.[1]||0)/100*.75+[0,0,.10,.20][k('en')]*.7);
   const block=(k('pr')+(h.ball&&counterTypes.includes('terra')?.7:0)+(h.band||0)/100+k('en')*.5)*v.hp*.045;
   const recoil=v.hp*(h.rec||0)/100*(basicCount+3*expectedSpecials);
-  const reflected=damage*.0+v.hp*(c.ability==='contra'?[.15,.2,.25][rank-1]*.5:0)+v.hp*(h.helm||0)/100*(1-incomingRanged)*basicCount*.45;
+  const reflected=v.hp*(c.ability==='contra'?[.15,.2,.25][rank-1]*.5:0)+v.hp*(h.helm||0)/100*(1-incomingRanged)*basicCount*.45;
   const bulk=Math.max(v.hp*.25,v.hp+heal+drain+once+block-recoil)*defFactor;
   const attack=Math.max(.01,(damage+reflected)/horizon),speed=1/cycle;
-  const utility=1+Math.min(.12,(h.fl||0)/100*.25+(h.ej||h.rc?.03:0));
+  const utility=1+Math.min(.12,(h.fl||0)/100*.25+((h.ej||h.rc)?.03:0));
   const score=(objective==='offense'?attack**.8*speed**.2*bulk**.18:objective==='tank'?bulk**.8*attack**.25:objective==='speed'?speed**.85*attack**.4*bulk**.2:attack**.55*speed**.15*bulk**.4)*utility;
   return {score,dps:attack,bulk,cycle};
  };
@@ -252,9 +264,10 @@ function teamPlan(q,progress=()=>{}){
    const megaPKL=form?Math.ceil(C.mega.price*attempts):0,sol=form?C.mega.sol*attempts:0;if(sol>solBudget+1e-9||acq.pkl+megaPKL>budget)continue;
    for(const item of itemMap.values()){
     const equipment=itemCost(item);if(acq.pkl+megaPKL+equipment>budget)continue;
+    const baseline=dexPreview({...config,id:sp.id,form,item,tms:[],rankFast:true});
     for(const tms of variants.values()){
      const tm=tms.reduce((sum,t)=>sum+tmCost(t),0),cost=acq.pkl+equipment+tm+megaPKL;if(cost>budget)continue;
-     const v=rankOne(config,sp,form,item,tms);evaluated++;
+     const v=rankOne(config,sp,form,item,tms,baseline);evaluated++;
      for(const route of acquisitions){const total=route.pkl+equipment+tm+megaPKL;if(total>budget)continue;const estimate=strength(v);const row={...v,...estimate,cost:total,sol,candy:route.candy,acquisition:route,equipment,tm,megaPKL,megaChance:form?megaChance:null,build:{id:sp.id,lv,ability:rank,item,tms,mega:form}};options.push(row);}
     }
    }
@@ -277,18 +290,22 @@ function teamPlan(q,progress=()=>{}){
  const bands=[budget/24,budget/12,budget/8,budget/6,budget/4,budget/2,budget];
  for(const cap of bands){const pool=candidates.filter(r=>r.cost<=cap).sort((a,b)=>b.score-a.score||a.cost-b.cost);pool.slice(0,55).forEach(put);for(const t of types)pool.filter(r=>r.types.includes(t)).slice(0,3).forEach(put);}
  candidates.slice().sort((a,b)=>a.cost-b.cost||b.score-a.score).slice(0,80).forEach(put);
+ if(Number.isFinite(candyBudget))candidates.slice().sort((a,b)=>a.candy-b.candy||a.cost-b.cost||b.score-a.score).slice(0,100).forEach(put);
  const pool=[...shortlist.values()];
+ // Always retain the cheapest feasible baseline as a fallback when beam pruning misses it.
+ const cheapest=[];for(const r of candidates.slice().sort((a,b)=>a.cost-b.cost||a.candy-b.candy||b.score-a.score)){if(cheapest.length>=size)break;if(cheapest.some(x=>x.id===r.id)||r.form||cheapest.reduce((n,x)=>n+x.cost,0)+r.cost>budget||cheapest.reduce((n,x)=>n+x.candy,0)+r.candy>candyBudget)continue;cheapest.push(r);}
  let beam=[{team:[],cost:0,sol:0,candy:0,mega:0,value:0}],deepest=beam;
  for(let depth=0;depth<size;depth++){
   progress({scanned:all.length,total:all.length,evaluated,phase:'roster',depth,size});
   const buckets=new Map(),seen=new Set();
   for(const state of beam)for(const r of pool){if(state.cost+r.cost>budget||state.candy+r.candy>candyBudget||state.sol+r.sol>solBudget+1e-9||state.mega+Boolean(r.form)>maxMega||state.team.some(x=>x.id===r.id))continue;
    const team=[...state.team,r],cost=state.cost+r.cost,sol=state.sol+r.sol,candy=state.candy+r.candy,mega=state.mega+Number(!!r.form),sig=team.map(x=>x.id+':'+x.form+':'+x.cost+':'+x.candy+':'+x.score).sort().join('|');if(seen.has(sig))continue;seen.add(sig);
-   const value=evaluate(team),bin=Math.min(15,Math.floor(cost/Math.max(1,budget)*16)),key=bin+':'+mega;
+   const value=evaluate(team),bin=Math.min(15,Math.floor(cost/Math.max(1,budget)*16)),key=bin+':'+mega+':'+(Number.isFinite(candyBudget)?Math.min(3,Math.floor(candy/Math.max(1,candyBudget)*4)):0);
    const bucket=buckets.get(key)||[];bucket.push({team,cost,sol,candy,mega,value});bucket.sort((a,b)=>b.value-a.value||a.cost-b.cost);if(bucket.length>3)bucket.pop();buckets.set(key,bucket);
   }
   beam=[...buckets.values()].flat().sort((a,b)=>b.value-a.value||a.cost-b.cost).slice(0,48);if(!beam.length)break;deepest=beam;
  }
+ if(cheapest.length>deepest[0].team.length||cheapest.length===deepest[0].team.length&&evaluate(cheapest)>deepest[0].value)deepest.unshift({team:cheapest,cost:cheapest.reduce((n,x)=>n+x.cost,0),sol:0,candy:cheapest.reduce((n,x)=>n+x.candy,0),value:evaluate(cheapest)});
  const best=deepest[0],alternatives=[];for(const state of deepest){if(alternatives.length>=3)break;const sig=state.team.map(x=>x.id).sort().join('|');if(alternatives.some(a=>a.signature===sig))continue;alternatives.push({signature:sig,team:state.team.slice().sort((a,b)=>b.score-a.score),cost:state.cost,sol:state.sol,candy:state.candy,score:state.value});}return {alternatives,team:best.team.sort((a,b)=>b.score-a.score||a.expectedCooldown-b.expectedCooldown),cost:best.cost,sol:best.sol,score:best.value,complete:best.team.length===size,size,budget,evaluated,candidates:candidates.length,shortlist:pool.length,coverage:types.filter(t=>best.team.some(r=>r.types.some(a=>GD.eff(a,[t])>1))),weak:types.filter(t=>best.team.some(r=>GD.eff(t,r.types)>1)&&!best.team.some(r=>GD.eff(t,r.types)<1)),candy:best.candy,candyBudget:Number.isFinite(candyBudget)?candyBudget:null,trainingCandy:best.team.reduce((n,r)=>n+r.acquisition.training,0),abilityCandy:best.team.length*abilityCandy,trainingXP:best.team.reduce((n,r)=>n+r.acquisition.xp,0),tmPricing:q.tmPricing==='manual'?'manual':'expected',tmUnitCosts:Object.fromEntries(Object.keys(GD.SKILL_R).map(k=>[k,tmPrice(k)])),tmReserve,priceFactor:mult,megaCost:q.megaCost,mode:mode.name,stone:C.shop.stone,tmCase:C.shop.tm,megaAttempt:C.mega.price,megaSOL:C.mega.sol};
 }
 function timingFor(id,ranged,load=false){
