@@ -150,7 +150,8 @@ function renderTeam(i) {
     const displayed=mon?.name || (slot.mega?s.mega[slot.mega-1]:s.name);
     const details='Lv '+(mon?.lv ?? levelFor(slot))+(live?'':' · '+s.types.map(t=>catalog.types[t]).join('/')+(items[slot.item]?' · '+items[slot.item].name:''));
     const action=(running?'Switch to ':'Edit ')+s.name;
-    return '<div class="slot'+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,aiControlled):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
+    const lead=!live&&battleIndex===0;
+    return '<div class="slot'+(lead?' lead-slot':'')+(active?' selected':'')+(mon?.ko?' knocked':'')+'"><button class="slot-main" '+(running?'data-swap="'+battleIndex+'"':'data-edit="'+index+'"')+disabled(running?!canSwapTo(current,battleIndex,aiControlled):bench||starting)+' aria-label="'+escape(action)+'" title="'+escape(action+' · '+details)+'"><img data-portrait="'+escape(s.id)+'" src="'+portrait(s.id,mon?.portrait)+'" alt=""><span class="slot-content"><strong>'+escape(displayed)+'</strong><small>'+escape(details)+'</small>'+(live?'<span class="mini" aria-hidden="true">'+healthFill(mon)+'</span>':'')+'</span></button>'
       +(locked?'':'<div class="slot-buttons"><button data-reorder="'+index+',-1" aria-label="Move '+escape(s.name)+' up"'+disabled(index===0)+'>↑</button><button data-reorder="'+index+',1" aria-label="Move '+escape(s.name)+' down"'+disabled(index===5)+'>↓</button></div>')+'</div>';
   }).join('');
   target.innerHTML='<div class="active-card">'+activeCard(i,current)+'</div><header class="team-head"><h2>'+title(i)+'</h2><select aria-label="'+title(i)+' tactic" data-tactic'+disabled(locked)+'>'+options(tactic,config.tactics[i])+'</select></header><div class="team-list" role="group" aria-label="'+title(i)+' lineup">'+list+'</div><div class="team-controls"><label><select data-auto aria-label="'+title(i)+' Special control"'+disabled(aiControlled||bench||starting)+'>'+options([['on',aiControlled?'Auto battle active':'Auto Special'],['off','Manual Special']],aiControlled||config.automatic[i]?'on':'off')+'</select></label><label class="auto-toggle" title="Smart AI chooses swaps, specials, Mega timing and replacements. Turn off to control this team manually; dodges are passive."><input type="checkbox" data-full-ai'+(config.fullAI[i]||isArenaOpponent?' checked':'')+disabled(locked||isArenaOpponent)+'> Auto battle</label></div>';
@@ -213,6 +214,7 @@ function updateBattleActions() {
     const panel=actions.children[i];
     const state=live.sides[i];
     const ai=(mode().kind==='arena'&&i===1)||config.fullAI[i];
+    panel.classList.toggle('auto-controlled',ai);
     const charge=Math.floor((state.meter||0)*100);
     const special=panel.querySelector('.pv-sp');
     const ready=state.canSpecial&&!ai&&!finishing;
@@ -374,6 +376,14 @@ $('rules').onchange=()=>{config.mode=$('rules').value;persist();clearBattle();};
 $('seed').onchange=configPayload;
 $('random').onclick=()=>{$('seed').value=crypto.getRandomValues(new Uint32Array(1))[0];configPayload();};
 $('log-filter').onchange=eventRows;
+const logPanel=document.querySelector('.log-panel');
+function setLogOpen(open){$('log-toggle').setAttribute('aria-expanded',String(open));logPanel.classList.toggle('log-collapsed',!open);$('log').hidden=!open;$('log-toggle').querySelector('span').textContent=open?'▾':'▸';if(open)$('log').scrollTop=$('log').scrollHeight;}
+setLogOpen(!matchMedia('(max-width:760px)').matches);
+$('log-toggle').onclick=()=>setLogOpen($('log-toggle').getAttribute('aria-expanded')!=='true');
+$('settings-done').onclick=()=>{document.querySelector('.advanced-settings').open=false;document.querySelector('.advanced-settings summary').focus();};
+const settings=document.querySelector('.advanced-settings');
+settings.addEventListener('click',e=>{if(e.target===settings&&settings.open)settings.open=false;});
+settings.addEventListener('keydown',e=>{if(e.key==='Escape'&&settings.open){e.preventDefault();settings.open=false;settings.querySelector('summary').focus();}});
 function connectArena() {
   arena=arenaFrame.contentWindow.arenaView;
   $('arena-message').hidden=Boolean(arena);
@@ -541,7 +551,7 @@ $('editor-form').onsubmit=e=>{
 connect();
 
 const toolsBar=document.createElement('nav');toolsBar.className='lab-tools';toolsBar.setAttribute('aria-label','ClashLab tools');
-toolsBar.innerHTML='<button class="secondary dex-launch" id="dex-open">ClashDex <span>Pokédex</span></button><details class="tool-menu"><summary>Analysis</summary><div class="tool-menu-content"><button class="secondary" id="team-inspect">Team analyzer</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button></div></details><details class="tool-menu"><summary>Manage teams</summary><div class="tool-menu-content"><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="team-import">Import JSON</button><button class="secondary" id="team-export">Export JSON</button></div></details>';
+toolsBar.innerHTML='<button class="secondary dex-launch" id="dex-open" aria-label="Open ClashDex">ClashDex <span>Pokédex</span></button><details class="tool-menu"><summary>Analysis</summary><div class="tool-menu-content"><button class="secondary" id="team-inspect">Team analyzer</button><button class="secondary" id="compare-open">Compare Pokémon</button><button class="secondary" id="counter-open">Counter Finder</button><button class="secondary" id="rank-open">Rarity rankings</button><button class="secondary" id="build-open">Build Advisor</button></div></details><details class="tool-menu"><summary aria-label="Manage teams"><span class="desktop-menu-label">Manage teams</span><span class="mobile-menu-label">Teams</span></summary><div class="tool-menu-content"><button class="secondary" id="presets-open">Saved teams</button><button class="secondary" id="team-import">Import JSON</button><button class="secondary" id="team-export">Export JSON</button></div></details>';
 toolsBar.addEventListener('click',e=>{if(e.target.closest('button'))for(const d of toolsBar.querySelectorAll('details'))d.open=false;});
 toolsBar.addEventListener('toggle',e=>{if(e.target.tagName==='DETAILS'&&e.target.open)for(const d of toolsBar.querySelectorAll('details'))if(d!==e.target)d.open=false;},true);
 document.querySelector('.setup').before(toolsBar);
