@@ -71,12 +71,48 @@ function dexPreview(q) {
  const tags=it?core.heldTags(it):[];
  return {effective,bonus,mode:mode.name,form:mega?u.sp.name:sp.name,types:u.types,specialType:hb?.mty||null,
    hp:u.max,currentHP:u.hp,atk:u.atk,def:u.def,spd:u.spd,attack:game.atkOf(u),defense:game.defOf(u),megaMultiplier:u.megaMul||1,
+   damageTaken:(hb?.taken||1)*(u.ab==='pele'?1-[.10,.15,.20][abLv-1]:1),rangedDamageTaken:hb?.vsR||1,ranged:u.ranged,
    firstHitAttack:game.atkOf(u)*(u.ab==='mira'?1+[.4,.55,.7][abLv-1]:1),
    cooldown,cooldownAdjusted:cooldown/speedMul,recovery:u.ranged?0:.5,speedMul,crit:Math.min(1,crit),critMultiplier:u.ab==='certeiro'?1.8:1.5,dodge:Math.min(1,dodge),specialDodge:Math.min(1,dodge/2),
    synergy,basicPower,specialPower,specialMultiplier:1.3*2.1*(u.ab==='explosao'?1+[.2,.35,.5][abLv-1]:1)*(1+[0,.2,.3,.4][skill('gi')]),
    item:it?def.n:null,tags,heldActive:!!hb,held:hb||null,skills:sk,read:game.read[0],ability:sp.abN,
    animation:timingFor(q.id,u.ranged)};
 }
+
+/* Rank configured legal builds without running battles or fetching sprites. */
+function dexRank(q) {
+ const candidates=[],skipped={incompatible:0,locked:0,inactive:0},lv=Math.max(1,Math.min(50,Math.trunc(Number(q.lv)||1)));
+ const selected=(q.tms||[]).filter(t=>t&&t.k);
+ if(selected.length>1&&lv<12)throw Error('Second TM requires base level 12.');
+ if(new Set(selected.map(t=>t.k)).size!==selected.length)throw Error('Select two different TMs.');
+ const all=Object.values(GD.SPECIES), item=q.item===''?-1:Number(q.item);
+ for(const sp of all){
+  if(q.rarity&&GD.RAR[sp.rar].n!==q.rarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.innate&&GD.innateOf(sp.id)!==q.innate||q.abilityName&&sp.abN!==q.abilityName)continue;
+  if(selected.some(t=>t.k===GD.innateOf(sp.id)||!GD.learnOf(sp.id).includes(t.k))){skipped.incompatible++;continue;}
+  const def=runtime.core.CFG.items[item],it=def?{k:item,r:def.r}:null;
+  if(q.activeOnly&&it&&!runtime.core.heldFx(it,sp.id)){skipped.inactive++;continue;}
+  const forms=[0,...(GD.MEGA_SP[sp.id]?[1]:[]),...(GD.MEGA_SP2[sp.id]?[2]:[])].filter(f=>q.forms==='mega'?f>0:q.forms==='all'?true:f===0);
+  for(const form of forms){
+   const v=dexPreview({...q,id:sp.id,form,lv,tms:selected});
+   const chance=Math.min(1,Math.max(0,(v.held?.qc||0)/100));
+   const expectedCooldown=((1-chance)*v.cooldown+chance*.3)/v.speedMul;
+   const incoming=q.incoming&&Object.hasOwn(GD.TYPES,q.incoming)?GD.eff(q.incoming,v.types):1;
+   const taken=v.damageTaken*(q.attackerRange==='ranged'?v.rangedDamageTaken:1);
+   const dodge=q.incomingKind==='special'?v.specialDodge:v.dodge;
+   const bulk=v.currentHP*(120+v.defense)/120/Math.max(.0001,taken*incoming);
+   const evadeBulk=bulk/Math.max(.0001,1-dodge);
+   const forced=Object.entries(self.FORMS?.[sp.id]||{}).find(([key])=>key===def?.k);
+   const key=form?sp.id+':'+form:forced&&v.heldActive?sp.id+':held:'+item:sp.id+':0';
+   candidates.push({key,id:sp.id,form,name:v.form,types:v.types,ranged:v.ranged,ability:sp.abN,innate:GD.innateOf(sp.id),rarity:GD.RAR[sp.rar].n,
+    effective:v.effective,bonus:v.bonus,hp:v.hp,currentHP:v.currentHP,atk:v.attack,def:v.defense,spd:v.spd,moveSpeed:60+v.spd*.9,
+    cooldown:v.cooldownAdjusted,expectedCooldown,bulk,evadeBulk,crit:v.crit*100,dodge:dodge*100,firstHit:v.firstHitAttack,
+    active:v.heldActive,protect:v.skills.find(t=>t.k==='pr')?.lv||0,recover:v.skills.find(t=>t.k==='rc')?.lv||0,
+    balloon:!!(v.held?.ball&&q.incoming==='terra')});
+  }
+ }
+ return {rows:candidates,skipped};
+}
+
 function timingFor(id,ranged,load=false){
  const anim=ranged?'Shoot':'Attack';
  if(load&&!loadedTimings.has(id)){try{importScripts(upstream+'sp/'+encodeURIComponent(id)+'.js');if(self.SPRITE_T[id])loadedTimings.add(id);}catch{}}
@@ -119,6 +155,7 @@ function benchmark(config, job) {
 self.onmessage = ({data}) => {
   try {
     if(!runtime) throw Error('The upstream battle engine is unavailable.');
+    if(data.type==='dex-rank'){try{send('dex-rank',{job:data.job,result:dexRank(data.config)});}catch(e){send('dex-rank',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-preview'){try{send('dex-preview',{job:data.job,result:dexPreview(data.config)});}catch(e){send('dex-preview',{job:data.job,error:e.message});}return;}
     if(data.type==='dex-timing'){const id=String(data.id);if(!GD.SPECIES[id])return;send('dex-timing',{job:data.job,result:timingFor(id,GD.ROLES[GD.SPECIES[id].role].ranged,true)});return;}
     if(data.type==='benchmark')benchmark(data.config,data.job);
