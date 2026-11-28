@@ -243,7 +243,7 @@ function teamPlan(q,progress=()=>{}){
   if(++scanned%24===0)progress({scanned,total:all.length,evaluated,phase:'builds'});
   if(sp.rar<minRarity||sp.rar>maxRarity||q.range&&Boolean(GD.ROLES[sp.role].ranged)!==(q.range==='ranged')||q.type&&!sp.types.includes(q.type)||q.finalOnly&&(GD.EVO[sp.id]||[]).length)continue;
   const acquisitions=acquire(sp.id).filter(a=>a.pkl<=budget);if(!acquisitions.length)continue;const acq=acquisitions[0];
-  const megaChance=(C.mega.ok[sp.rar]||0)/100,attempts=q.megaCost==='attempt'?1:1/Math.max(.01,megaChance);
+  const megaChance=(C.mega.ok[sp.rar]||0)/100,attempts=q.megaCost==='attempt'?1:q.megaCost==='90'?megaChance>=1?1:Math.ceil(Math.log(.1)/Math.log(1-Math.max(.01,megaChance))):1/Math.max(.01,megaChance);
   const forms=[0,...(maxMega&&GD.MEGA_SP[sp.id]?[1]:[]),...(maxMega&&GD.MEGA_SP2[sp.id]?[2]:[])];
   const config={lv,ability:rank,mode:mode.id,hpPct:100,tactic:q.tactic||'equilibrado',opponentTactic:'equilibrado',synergy:1,incoming:'',attackerRange:'melee',incomingKind:'basic',weaknessPolicy:false};
   const variants=new Map(),learn=GD.learnOf(sp.id).filter(k=>k!==GD.innateOf(sp.id)&&k!=='ch'),ranks=Array.from({length:rank},(_,i)=>i+1),empty={k:'',lv:1};
@@ -258,14 +258,17 @@ function teamPlan(q,progress=()=>{}){
   const choices=['',...C.items.map((it,k)=>String(k)).filter(k=>C.items[Number(k)].r<=bounded(q.maxItemRarity,0,5,5))];
   // Prune items only when their full native held effect and effective level agree; retain cheaper representative.
   const itemMap=new Map();
-  for(const item of choices){const it=item===''?null:{k:Number(item),r:C.items[Number(item)].r},h=core.heldFx(it,sp.id),bonus=core.itemLv(it,sp.id),eff=!mode.cap?lv+bonus:mode.kind==='arena'?Math.min(lv,mode.cap)+bonus:Math.min(lv+bonus,mode.cap),key=JSON.stringify([eff,h||null]);if(!itemMap.has(key)||itemCost(item)<itemCost(itemMap.get(key)))itemMap.set(key,item);}
+  for(const item of choices){const it=item===''?null:{k:Number(item),r:C.items[Number(item)].r},h=core.heldFx(it,sp.id),bonus=core.itemLv(it,sp.id),eff=!mode.cap?lv+bonus:mode.kind==='arena'?Math.min(lv,mode.cap)+bonus:Math.min(lv+bonus,mode.cap),key=JSON.stringify([eff,h?Object.fromEntries(Object.entries(h).filter(([k])=>k!=='k'&&k!=='n')):null]);if(!itemMap.has(key)||itemCost(item)<itemCost(itemMap.get(key)))itemMap.set(key,item);}
   const options=[];
   for(const form of forms){
    const megaPKL=form?Math.ceil(C.mega.price*attempts):0,sol=form?C.mega.sol*attempts:0;if(sol>solBudget+1e-9||acq.pkl+megaPKL>budget)continue;
+   let skillChoices=[...variants.values()];
+   // Standard search keeps the best economical skill combinations plus diverse conditional-skill variants.
+   if(q.searchDepth!=='deep'&&skillChoices.length>24){const base=dexPreview({...config,id:sp.id,form,item:'',tms:[],rankFast:true});const tests=skillChoices.map(tms=>({tms,cost:tms.reduce((n,t)=>n+tmCost(t),0),score:strength(rankOne(config,sp,form,'',tms,base)).score})).filter(x=>acq.pkl+megaPKL+x.cost<=budget).sort((a,b)=>b.score-a.score||a.cost-b.cost);const chosen=new Map(),add=x=>{if(x)chosen.set(JSON.stringify(x.tms),x.tms);};for(const cap of [0,budget/48,budget/24,budget/12,budget/6,budget/3,budget])tests.filter(x=>x.cost<=cap).slice(0,3).forEach(add);for(const k of ['ag','id','sd','dt','gd','rc','pr','en','gi','fe'])add(tests.find(x=>x.tms.some(t=>t.k===k)));skillChoices=[...chosen.values()];}
    for(const item of itemMap.values()){
     const equipment=itemCost(item);if(acq.pkl+megaPKL+equipment>budget)continue;
     const baseline=dexPreview({...config,id:sp.id,form,item,tms:[],rankFast:true});
-    for(const tms of variants.values()){
+    for(const tms of skillChoices){
      const tm=tms.reduce((sum,t)=>sum+tmCost(t),0),cost=acq.pkl+equipment+tm+megaPKL;if(cost>budget)continue;
      const v=rankOne(config,sp,form,item,tms,baseline);evaluated++;
      for(const route of acquisitions){const total=route.pkl+equipment+tm+megaPKL;if(total>budget)continue;const estimate=strength(v);const row={...v,...estimate,cost:total,sol,candy:route.candy,acquisition:route,equipment,tm,megaPKL,megaChance:form?megaChance:null,build:{id:sp.id,lv,ability:rank,item,tms,mega:form}};options.push(row);}
